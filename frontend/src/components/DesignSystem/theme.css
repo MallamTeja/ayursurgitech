@@ -1,0 +1,456 @@
+/* =============================================================================
+   AyursurgiTech Design System v1.0 — "Clinical Precision"
+   The token layer. docs/AyursurgiTech-Design-System-v1.0.md is the contract;
+   every value below traces to a § in it, and nothing here is invented without
+   a comment saying why.
+
+   WHY THIS IS A SEPARATE FILE AND NOT index.css
+   index.css already carries a *different, live* palette — the navy/copper shop
+   theme built from docs/DESIGN-SYSTEM.md. That system is shipping. This one is
+   the v1.0 B2B direction. Both now exist in the repo, so the only safe move is
+   to keep them namespaced apart: nothing here reuses a token name that file
+   already defines. The collisions that were waiting to happen, avoided:
+
+     legacy owns          → we use
+     --color-ink          → --color-fg           (#2A2A28 vs #16323D)
+     --color-line         → --color-edge         (#E5E0D6 vs #DCE7E9)
+     --color-paper/card   → --color-surface
+     --radius-card: 10px  → Tailwind's rounded-xl (12px, §9)
+     --text-3xl: 2rem     → .type-* named styles (see TYPOGRAPHY below)
+     --shadow-lift        → --shadow-e1 / --shadow-e2 (§10)
+
+   Redefining any of those would silently restyle the running shop.
+   ============================================================================= */
+
+/* `static` and not a bare @theme: Tailwind v4 tree-shakes theme variables it
+   cannot see used as a utility, and this system reads several tokens through
+   raw var() — the swatch grid on the Colours page, the chart series, the scrim.
+   A design system's tokens should all be present in :root regardless of whether
+   a utility class happened to reference them. */
+@theme static {
+  /* ---------------------------------------------------------------------------
+     COLOUR — §3, §4, §30
+     Utilities generated: bg-brand-600, text-fg-muted, border-edge, …
+     --------------------------------------------------------------------------- */
+
+  /* Brand — §3.1. brand-600 is THE primary action colour. §3.1 also warns it is
+     not a page background; nothing in this system fills a viewport with it. */
+  --color-brand-900: #123b4a; /* deep brand, headings, dark navigation */
+  --color-brand-700: #0a6170; /* hover for primary; and see LINKS note below */
+  --color-brand-600: #087f8c; /* PRIMARY — buttons, active nav, selected */
+  --color-brand-500: #39a9b6; /* accent. DECORATIVE ONLY — see the 2.79:1 note */
+  --color-brand-100: #ddf3f5; /* light brand backgrounds, badge tints */
+  --color-brand-50: #eff9fa; /* subtlest brand surface, selected table row */
+
+  /* Neutrals — §3.2 */
+  --color-canvas: #f7fafa; /* the application background */
+  --color-surface: #ffffff; /* cards, panels, dialogs */
+  --color-surface-2: #f0f5f5; /* secondary surfaces, table headers, wells */
+
+  /* Text — §3.2. Named fg-* because --color-ink is the legacy shop's. */
+  --color-fg: #16323d; /* primary text. §3.2: never #000 */
+  --color-fg-secondary: #536b73; /* supporting text AND captions — see §CAPTIONS */
+  --color-fg-muted: #82949a; /* 3.16:1 — large text only, never body */
+  --color-fg-disabled: #aab8bc; /* pairs with a disabled affordance, not alone */
+
+  /* Borders — §3.2 */
+  --color-edge: #dce7e9;
+  --color-edge-strong: #c7d7da;
+
+  /* Semantic — §4. Each has three roles, and they are not interchangeable:
+       -bg    tinted surface
+       base   fills, icon glyphs, chart series, 20px+ display type
+       -700   TEXT on white/canvas/surface-2/its own tint  ← added, see below
+
+     WHY -700 EXISTS. §24 targets WCAG 2.2 AA. Measured against §4's own values,
+     every semantic badge as specified fails AA for its 12–14px label:
+       success #198754 on #EAF7F0 → 4.11:1   ✗
+       warning #C98200 on #FFF6E5 → 2.93:1   ✗✗  (and 3.15:1 even on white)
+       error   #C83C4A on #FDECEF → 4.38:1   ✗
+       info    #2778A5 on #EAF4FA → 4.36:1   ✗
+     The -700 steps below are the same hue and saturation walked down in
+     lightness until they clear 4.8:1 on all four backgrounds — the minimum
+     change that makes §4 and §24 true at the same time. Sanity check: the
+     warning step landed on #956000, within a hair of GitHub Primer's
+     attention-fg #9A6700, which is the same problem solved the same way. */
+  --color-success: #198754;
+  --color-success-bg: #eaf7f0;
+  --color-success-700: #177a4c; /* 5.35 white · 5.10 canvas · 4.86 tint */
+
+  --color-warning: #c98200;
+  --color-warning-bg: #fff6e5;
+  --color-warning-700: #956000; /* 5.32 white · 5.06 canvas · 4.95 tint */
+
+  --color-error: #c83c4a;
+  --color-error-bg: #fdecef;
+  --color-error-700: #bf3644; /* 5.49 white · 5.23 canvas · 4.81 tint */
+
+  --color-info: #2778a5;
+  --color-info-bg: #eaf4fa;
+  --color-info-700: #25719b; /* 5.37 white · 5.11 canvas · 4.81 tint */
+
+  /* Scrim for dialogs and drawers. §10 and §30 are silent on it, and a modal
+     needs one. brand-900 at 45% keeps the overlay inside the palette instead of
+     introducing a neutral grey that belongs to no token. */
+  --color-scrim: rgb(18 59 74 / 0.45);
+
+  /* ---------------------------------------------------------------------------
+     ELEVATION — §10. Two steps, both tinted with brand-900 so shadows read as
+     part of the palette. §10: "Background + Border" is the default; reach for
+     e1 on hover, e2 only for things that float (dialog, drawer, menu, toast).
+     --------------------------------------------------------------------------- */
+  --shadow-e1: 0 1px 3px rgb(18 59 74 / 0.08);
+  --shadow-e2: 0 8px 24px rgb(18 59 74 / 0.1);
+
+  /* ---------------------------------------------------------------------------
+     LAYOUT — §11, §23. Two widths, because the portals are not the same shape:
+     the customer site is a reading column, the admin panel is a workspace.
+     --------------------------------------------------------------------------- */
+  --container-content: 1200px; /* customer portal — §11.1 */
+  --container-app: 1536px; /* admin/agent workspace — §11.2 */
+
+  /* ---------------------------------------------------------------------------
+     NOT TOKENISED, ON PURPOSE
+
+     SPACING §8 — the 4/8/12/16/24/32/48/64/80 ladder is exactly Tailwind's
+     default 4px scale (p-1 p-2 p-3 p-4 p-6 p-8 p-12 p-16 p-20). Re-declaring it
+     would create a second source of truth for numbers that already agree.
+
+     RADIUS §9 — 8px buttons/inputs = rounded-lg, 12px cards = rounded-xl,
+     16px panels/dialogs = rounded-2xl, pills = rounded-full. Tailwind's default
+     scale already IS §9. Custom radius tokens would only invite drift, and
+     --radius-card is the legacy shop's at a different value.
+
+     FONT §6 — --font-sans is already "Inter" in index.css and index.html
+     already loads it at 400/500/600, which is precisely the range §7 permits.
+     Nothing to add.
+     --------------------------------------------------------------------------- */
+}
+
+/* =============================================================================
+   SCOPE RESET
+   Everything in this system renders inside .ds-root. Two things in the legacy
+   base layer have to be undone within that scope or the whole system looks
+   wrong, and neither is obvious from reading a component:
+
+   1. index.css sets `h1, h2, h3 { font-family: var(--font-display) }` — that is
+      Fraunces, a serif, with SOFT/WONK variation axes on h1. §6 says Inter
+      throughout. Left alone, every heading in this design system silently
+      renders in the other brand's display serif.
+   2. index.css sets the global focus ring to the legacy blue-500. §24 requires
+      a visible focus state; it should be this system's brand colour.
+   ============================================================================= */
+
+@layer base {
+  .ds-root {
+    background-color: var(--color-canvas);
+    color: var(--color-fg);
+    font-family: var(--font-sans);
+    font-size: 16px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* :where() keeps this at zero specificity for the *element*, so the .type-*
+     classes below and any Tailwind utility both win without !important. */
+  .ds-root :where(h1, h2, h3, h4, h5, h6) {
+    font-family: var(--font-sans);
+    font-weight: 600;
+    line-height: 1.2;
+    letter-spacing: -0.01em;
+    font-variation-settings: normal;
+  }
+
+  .ds-root :where(:focus-visible) {
+    outline: 2px solid var(--color-brand-600);
+    outline-offset: 2px;
+  }
+
+  /* Inputs inherit the page font in every browser except the one you forgot. */
+  .ds-root :where(input, select, textarea, button) {
+    font: inherit;
+    color: inherit;
+  }
+
+  /* Modal and drawer scrim.
+     Modal.jsx and Drawer.jsx use a native <dialog>, which brings Esc, focus
+     containment and an inert background page for free — the same reasoning the
+     shop's mobile nav drawer already relies on. Its backdrop can only be reached
+     through ::backdrop, so it is styled here rather than with a utility class.
+
+     The colour is written out rather than as var(--color-scrim) because
+     ::backdrop is generated outside the element tree and does not inherit
+     custom properties from :root in every engine. Keep it in step with
+     --color-scrim above.
+
+     The descendant selector still applies: promoting a dialog to the top layer
+     moves where it *paints*, not where it sits in the DOM. */
+  .ds-root dialog::backdrop {
+    background-color: rgb(18 59 74 / 0.45);
+    animation: ds-fade-in 0.15s ease-out;
+  }
+
+  /* Browsers give <dialog> a border, padding and a centred max-width. All of it
+     is replaced by the component, so clear it once here. */
+  .ds-root dialog {
+    max-width: none;
+    max-height: none;
+    border: 0;
+    padding: 0;
+    background: transparent;
+  }
+}
+
+/* =============================================================================
+   A CLOSED DIALOG MUST BE HIDDEN. Deliberately outside every @layer.
+
+   THE BUG THIS FIXES. A <dialog> is hidden by the browser's own stylesheet:
+
+       dialog:not([open]) { display: none }
+
+   That rule is USER-AGENT origin. Any author declaration beats it, regardless of
+   specificity — and `class="flex"` on the dialog is exactly that:
+
+       .flex { display: flex }        author origin, @layer utilities
+
+   So Drawer (flex) and Modal (grid) were displayed permanently: laid out over the
+   page, focusable, in the accessibility tree, with no backdrop because showModal()
+   had never run. It did not look like a dialog that would not close. It looked
+   like a dialog that was never closed — because it never was.
+
+   WHY UNLAYERED RATHER THAN IN @layer base. Layer order outranks specificity, and
+   `utilities` is declared after `base`, so a rule in base loses to `.flex` however
+   specific it is. Declarations outside every layer sort above all layered ones, so
+   this is the only placement that actually wins. It is also why !important is not
+   needed here.
+
+   WHY HERE AND NOT IN THE COMPONENTS. Moving the flex/grid utility onto an inner
+   wrapper would fix the two dialogs that exist today and none of the ones added
+   later. This holds for every dialog in the system, including the next one someone
+   writes without knowing any of the above.
+   ============================================================================= */
+.ds-root dialog:not([open]) {
+  display: none;
+}
+
+/* =============================================================================
+   TYPOGRAPHY — §6.1 as named text styles
+   WHY CLASSES AND NOT --text-* TOKENS: §6.1 asks for 48/40/32/28/20/18/16/14/12.
+   Tailwind's default scale has no 40 or 28, and index.css has already overridden
+   --text-3xl to 32px and --text-5xl to 44px for the legacy brand. Named styles
+   sidestep both problems, and they are how the scale exists in Figma anyway —
+   one class per row of the §6.1 table, so a mismatch is greppable.
+
+   RESPONSIVE: §6.1 gives one fixed size per style and §23 asks for responsive
+   layout. A 48px display line does not fit a 360px viewport. Display→H3 use
+   clamp() with the §6.1 value as the *maximum*, so desktop is exactly the spec
+   and small screens degrade instead of overflowing. H4 and below are already
+   small enough to stay fixed.
+   ============================================================================= */
+
+@layer components {
+  .type-display {
+    font-size: clamp(2rem, 1.25rem + 3.75vw, 3rem); /* 32 → 48 */
+    font-weight: 600;
+    line-height: 1.1;
+    letter-spacing: -0.02em;
+  }
+  .type-h1 {
+    font-size: clamp(1.75rem, 1.25rem + 2.5vw, 2.5rem); /* 28 → 40 */
+    font-weight: 600;
+    line-height: 1.15;
+    letter-spacing: -0.02em;
+  }
+  .type-h2 {
+    font-size: clamp(1.5rem, 1.15rem + 1.75vw, 2rem); /* 24 → 32 */
+    font-weight: 600;
+    line-height: 1.2;
+    letter-spacing: -0.015em;
+  }
+  .type-h3 {
+    font-size: clamp(1.25rem, 1rem + 1.25vw, 1.75rem); /* 20 → 28 */
+    font-weight: 600;
+    line-height: 1.25;
+    letter-spacing: -0.01em;
+  }
+  .type-h4 {
+    font-size: 1.25rem; /* 20 */
+    font-weight: 600;
+    line-height: 1.3;
+  }
+  .type-body-lg {
+    font-size: 1.125rem; /* 18 */
+    font-weight: 400;
+    line-height: 1.55;
+  }
+  .type-body {
+    font-size: 1rem; /* 16 */
+    font-weight: 400;
+    line-height: 1.5;
+  }
+  .type-body-sm {
+    font-size: 0.875rem; /* 14 */
+    font-weight: 400;
+    line-height: 1.45;
+  }
+  .type-caption {
+    font-size: 0.75rem; /* 12 */
+    font-weight: 400;
+    line-height: 1.4;
+  }
+
+  /* --- Additions to §6.1, each earning its place ---------------------------- */
+
+  /* The eyebrow above a product name in §15's card ("I.V. INFUSION") and above
+     a metric in §19. §6.1 has no style for it, and it is on nearly every screen.
+     600 not 700: §7 says prefer 400/500/600. */
+  .type-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    line-height: 1.4;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  /* §6.1's dashboard table: metric 28–36px/600, heading 13–14px/600, body 14px.
+     tabular-nums is the point of all three — a column of ₹ figures that does not
+     align is a column you cannot scan, and §6 chose Inter for "excellent
+     numerals". Proportional digits throw that away. */
+  .type-metric {
+    font-size: clamp(1.75rem, 1.5rem + 1vw, 2.25rem); /* 28 → 36 */
+    font-weight: 600;
+    line-height: 1.1;
+    letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums;
+  }
+  .type-th {
+    font-size: 0.8125rem; /* 13 */
+    font-weight: 600;
+    line-height: 1.4;
+    letter-spacing: 0.02em;
+  }
+  .type-nav {
+    font-size: 0.9375rem; /* 15 */
+    font-weight: 500;
+    line-height: 1.4;
+  }
+
+  /* Any figure that sits in a column or gets compared: prices, stock, IDs. */
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* =============================================================================
+     DENSITY — §29
+     §29 says the three portals share the language but not the density, and then
+     gives no numbers. Without numbers "density" becomes whatever each developer
+     types, so here are three, applied as a class on any table or list:
+
+       .density-relaxed   56px rows   customer  (§29 low–medium)
+       .density-default   48px rows   agent     (§29 medium)
+       .density-compact   40px rows   admin     (§29 medium–high)
+
+     Row height is the only thing that changes. Type size, colour and border
+     weight stay put — a denser table is not a differently-styled table, and
+     that is what keeps the three portals recognisably one product.
+     ============================================================================= */
+  .density-relaxed {
+    --row-h: 3.5rem;
+    --row-px: 1.25rem;
+  }
+  .density-default {
+    --row-h: 3rem;
+    --row-px: 1rem;
+  }
+  .density-compact {
+    --row-h: 2.5rem;
+    --row-px: 0.75rem;
+  }
+}
+
+/* =============================================================================
+   MOTION
+   index.css already has a global prefers-reduced-motion block that flattens
+   every animation to 0.01ms, so the keyframes below inherit that for free.
+   Kept deliberately short: §32 Rule 10, no decoration at the cost of use.
+   ============================================================================= */
+
+@layer components {
+  @keyframes ds-fade-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+  @keyframes ds-rise {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  @keyframes ds-slide-in-right {
+    from {
+      transform: translateX(100%);
+    }
+    to {
+      transform: translateX(0);
+    }
+  }
+  @keyframes ds-slide-in-left {
+    from {
+      transform: translateX(-100%);
+    }
+    to {
+      transform: translateX(0);
+    }
+  }
+  @keyframes ds-pulse {
+    50% {
+      opacity: 0.55;
+    }
+  }
+  @keyframes ds-spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  .ds-fade-in {
+    animation: ds-fade-in 0.15s ease-out;
+  }
+  .ds-rise {
+    animation: ds-rise 0.18s ease-out;
+  }
+  .ds-slide-in-right {
+    animation: ds-slide-in-right 0.22s cubic-bezier(0.32, 0.72, 0, 1);
+  }
+  .ds-slide-in-left {
+    animation: ds-slide-in-left 0.22s cubic-bezier(0.32, 0.72, 0, 1);
+  }
+  .ds-pulse {
+    animation: ds-pulse 1.6s ease-in-out infinite;
+  }
+  .ds-spin {
+    animation: ds-spin 0.7s linear infinite;
+  }
+
+  /* Screen-reader-only, for the text half of "never colour alone" (§4) when the
+     visible half is an icon. */
+  .sr-only-ds {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border-width: 0;
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "name": "ayursurgitech",
+  "private": true,
+  "scripts": {
+    "dev": "pnpm --parallel --filter ayursurgitech-backend --filter ayursurgitech-frontend dev",
+    "dev:backend": "pnpm --filter ayursurgitech-backend dev",
+    "dev:frontend": "pnpm --filter ayursurgitech-frontend dev",
+    "seed": "pnpm --filter ayursurgitech-backend seed"
+  }
+}

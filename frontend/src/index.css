@@ -1,0 +1,113 @@
+@import "tailwindcss";
+
+/* Design System v1.0 — "Clinical Precision", the B2B direction from
+   docs/AyursurgiTech-Design-System-v1.0.md. Its tokens are namespaced so they
+   cannot collide with the shop palette below — it owns "brand-", "fg-" and
+   "edge-", this file keeps "blue-", "ink" and "line" — and everything it styles
+   is scoped to .ds-root. Read the header of that file before adding a token to
+   either system.
+   (Do not write a token prefix here as an asterisk followed by a slash: that
+   sequence closes this comment and the remainder becomes stray CSS.) */
+@import "./components/DesignSystem/theme.css";
+
+/* Tokens are DESIGN-SYSTEM.md made literal. Do not add a value that is not on that page. */
+@theme {
+  /* Colour */
+  --color-blue-900: #0A2240;  /* footer, admin sidebar, deepest surfaces */
+  --color-blue-700: #14406E;  /* PRIMARY — header, primary buttons */
+  --color-blue-500: #2C6499;  /* hover, links, success, focus ring */
+  --color-blue-100: #DCE6F2;  /* tints, badges, skeletons */
+
+  --color-paper:      #FFFFFF;  /* page background */
+  --color-shade:      #FAF8F4;  /* the ONLY recess: alternating sections, zebra rows, hovers */
+  --color-card:       #FFFFFF;
+  --color-ink:        #2A2A28;  /* body text — never pure black */
+  --color-ink-muted:  #6B6B63;  /* secondary text */
+  --color-line:       #E5E0D6;  /* every border */
+
+  --color-copper-600: #B87333;  /* accent — LARGE text and fills only */
+  --color-copper-700: #96541F;  /* accent for SMALL text, and accent button fill */
+  --color-copper-800: #7A4318;  /* accent button HOVER only — 7.95:1 on white */
+  --color-danger:     #A33A2A;
+
+  /* Type — two families, never a third */
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-display: "Fraunces", ui-serif, Georgia, serif;
+
+  /* Scale: seven sizes. Only these two differ from Tailwind's defaults. */
+  --text-3xl: 2rem;
+  --text-3xl--line-height: 1.15;
+  --text-5xl: 2.75rem;
+  --text-5xl--line-height: 1.15;
+  --text-2xl--line-height: 1.15;
+
+  --tracking-label: 0.08em;     /* uppercase labels */
+  /* Display tracking as a utility, for Fraunces text that is not an h1-h3 — the wordmark is
+     a <Link>, so the base-layer rule below never reaches it. */
+  --tracking-display: -0.02em;
+
+  /* Radius — three values only. Tight on controls, soft on cards. */
+  --radius-control: 4px;
+  --radius-card: 10px;
+  --radius-pill: 999px;
+
+  /* Exactly one shadow. Dropdowns, modals, sticky cart bar, hovered product card. */
+  --shadow-lift: 0 1px 2px rgba(42, 42, 40, .05), 0 10px 30px -18px rgba(42, 42, 40, .18);
+
+  /* Layout */
+  --container-page: 1200px;
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    background-color: var(--color-paper);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    line-height: 1.6;
+  }
+
+  /* Fraunces is loaded at 500 and 600, but every heading was 600 — the two faces differed by
+     size alone and 500 was dead weight in the font file. h2/h3 sit back at 500 so the page
+     has a hierarchy you can read at a glance, and h1 keeps 600. */
+  h1, h2, h3 {
+    font-family: var(--font-display);
+    font-optical-sizing: auto;
+    font-weight: 500;
+    letter-spacing: -0.02em;
+    line-height: 1.15;
+  }
+
+  /* The page title is the one heading allowed a voice. SOFT rounds the terminals a little —
+     warm rather than clinical, which is the whole brief — and WONK swaps in Fraunces' own
+     splayed alternates. One axis pair, on one element. Everything below it stays quiet.
+     Requires the wght RANGE in index.html: pinned weights ship a static font with no axes. */
+  h1 {
+    font-weight: 600;
+    font-variation-settings: 'SOFT' 20, 'WONK' 1;
+  }
+
+  /* Keyboard users need to see where they are. Dark surfaces override the colour only. */
+  :focus-visible {
+    outline: 2px solid var(--color-blue-500);
+    outline-offset: 2px;
+  }
+
+  /* The mobile nav drawer. <dialog> brings Esc, focus trapping and an inert page for free. */
+  dialog::backdrop {
+    /* blue-900 at half opacity. Kept literal because ::backdrop cannot see a var() defined
+       on :root in every engine. Update it with --color-blue-900. */
+    background-color: rgba(10, 34, 64, .5);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

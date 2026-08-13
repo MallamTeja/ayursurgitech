@@ -29,6 +29,7 @@ import Layout from './components/Layout';
 // these become the app's main chunk and the lazy boundary can go.
 const ShopShell = lazy(() => import('./shop/ShopShell'));
 const ProductsPage = lazy(() => import('./shop/ProductsPage'));
+const ProductPage = lazy(() => import('./shop/ProductPage'));
 const AboutPage = lazy(() => import('./shop/AboutPage'));
 const SupportPage = lazy(() => import('./shop/SupportPage'));
 const LoginPage = lazy(() => import('./shop/LoginPage'));
@@ -40,7 +41,6 @@ import Register from './pages/Register';
 import Search from './pages/Search';
 import Account from './pages/Account';
 import Category from './pages/Category';
-import Product from './pages/Product';
 import OrderDetail from './pages/OrderDetail';
 import Orders from './pages/Orders';
 import NotFound from './pages/NotFound';
@@ -93,6 +93,12 @@ export default function App() {
             bouncing through `/` again. */}
         <Route index element={<Navigate to="/products" replace />} />
         <Route path="products" element={<ProductsPage />} />
+        {/* The catalogue's Quick View footer links here ("Full product page"), so this
+            route was being reached from inside a v1.0 drawer while it still rendered
+            the old Layout's page — a palette change mid-flow, and an error state on
+            arrival, because pages/Product.jsx fetches the API and the catalogue's
+            slugs come from the dummy.js fixture. Migrated for both reasons. */}
+        <Route path="p/:slug" element={<ProductPage />} />
         {/* /about and /support were in the header nav before they existed, so
             both were 404s reached from every page. */}
         <Route path="about" element={<AboutPage />} />
@@ -107,16 +113,17 @@ export default function App() {
       </Route>
 
       {/* ---- The shop as it shipped ------------------------------------------- */}
-      {/* pages/Home.jsx is no longer routed. The file is left in place rather than
-          deleted — it is the only existing reference for the home page's content
-          when a v1.0 landing page is built. */}
+      {/* pages/Home.jsx and pages/Product.jsx are no longer routed. Both files are left
+          in place rather than deleted — Home is the only existing reference for the home
+          page's content, and Product.jsx is the only reference for an API-backed detail
+          page, which is what shop/ProductPage.jsx becomes when the fixture is swapped
+          for useFetch. */}
       <Route element={<Layout />}>
         <Route path="register" element={<Register />} />
         <Route path="search" element={<Search />} />
         <Route path="account" element={<Account />} />
         <Route path="c/:categorySlug" element={<Category />} />
         <Route path="c/:categorySlug/:subSlug" element={<Category />} />
-        <Route path="p/:slug" element={<Product />} />
         <Route path="order/:id" element={<OrderDetail />} />
         <Route path="orders" element={<Orders />} />
 

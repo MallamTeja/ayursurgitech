@@ -36,7 +36,6 @@ import {
   ProductCardSkeleton,
   ProductGrid,
   ProductImage,
-  QuantityStepper,
   Select,
   SpecTable,
   StatusBadge,
@@ -46,11 +45,10 @@ import {
   formatINR,
   formatQty,
   stockStatusOf,
-  useToast,
 } from '../components/DesignSystem';
 import { categories, products as allProducts } from '../components/DesignSystem/dummy.js';
 import usePageTitle from '../components/usePageTitle';
-import { useCart } from '../lib/cart';
+import AddToOrder from './AddToOrder.jsx';
 import { PER_PAGE, SORTS, slugOf } from './catalogue.js';
 import Facets from './Facets.jsx';
 import useProductQuery from './useProductQuery.js';
@@ -96,88 +94,6 @@ function useCatalogueData() {
   };
 }
 
-/** dummy.js speaks the design system's shape; the cart speaks the API's. */
-const toCartLine = (product) => ({
-  productId: product.id,
-  slug: slugOf(product),
-  name: product.name,
-  image: product.image ?? '',
-  price: product.price,
-  gstRate: product.gst,
-  minOrderQty: product.moq,
-  stockQty: product.stock,
-});
-
-/* -------------------------------------------------------------------------- */
-/* Add to Order                                                               */
-/* -------------------------------------------------------------------------- */
-
-/**
- * The procurement control: a stepper stepping in MOQ multiples, and the button.
- *
- * Out of stock disables the button rather than hiding it. Hiding leaves a gap where
- * an action was and makes the row look broken; a disabled button with the reason
- * beside it answers the question the buyer is about to ask. §4 — the reason is
- * words, not a colour.
- */
-function AddToOrder({ product, compact = false }) {
-  const { add } = useCart();
-  const toast = useToast();
-  const [qty, setQty] = useState(product.moq);
-  const outOfStock = product.stock <= 0;
-
-  const submit = () => {
-    add(toCartLine(product), qty);
-    toast.success(`${formatQty(qty)} × ${product.name} added`, { title: 'Added to your order' });
-    // Reset to the MOQ so the row does not sit there implying the next add is also
-    // 500 pieces.
-    setQty(product.moq);
-  };
-
-  if (outOfStock) {
-    return (
-      <div className={cx('flex flex-col items-end gap-1.5', compact && 'items-stretch')}>
-        <Tooltip label="Not in stock. Request a quote and an agent will confirm lead time.">
-          <Button size="sm" variant="secondary" disabled fullWidth={compact}>
-            Out of stock
-          </Button>
-        </Tooltip>
-        {/* Carry the product across. Landing on a blank contact form after
-            clicking Request quote on a specific out-of-stock item makes the
-            buyer retype what they just clicked; /support reads `product` and
-            `topic` and pre-fills both. */}
-        <Button
-          as={Link}
-          to={`/support?product=${encodeURIComponent(product.code)}&topic=quote`}
-          size="sm"
-          variant="tertiary"
-        >
-          Request quote
-        </Button>
-      </div>
-    );
-  }
-
-  return (
-    <div className={cx('flex flex-col gap-2', compact ? 'items-stretch' : 'items-end')}>
-      <QuantityStepper
-        value={qty}
-        onChange={setQty}
-        moq={product.moq}
-        max={product.stock}
-        uom={product.uom}
-        size="sm"
-      />
-      <Button size="sm" iconLeft={Icon.cart} onClick={submit} fullWidth={compact}>
-        Add to Order
-      </Button>
-      <p className="type-caption text-fg-muted">
-        {formatQty(product.moq)} minimum · {product.packSize}
-      </p>
-    </div>
-  );
-}
-
 /* -------------------------------------------------------------------------- */
 /* Quick view                                                                 */
 /* -------------------------------------------------------------------------- */
@@ -191,8 +107,8 @@ function AddToOrder({ product, compact = false }) {
  * stays in their result set.
  *
  * This is a complement to the product detail page, not a substitute — related
- * products, full documentation and the quote flow belong on a page. When /p/:slug is
- * migrated, the footer link here goes to it.
+ * products, full documentation and the quote flow belong on a page. The footer link
+ * goes to it: shop/ProductPage.jsx, in this shell and on this fixture.
  */
 function QuickView({ product, onClose }) {
   if (!product) return null;

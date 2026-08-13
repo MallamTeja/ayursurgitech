@@ -28,9 +28,17 @@ import { CountBadge, ORDER_FLOW, ORDER_STATUS } from './Badge.jsx';
  *
  * Long trails collapse in the middle on mobile rather than wrapping to three
  * lines: the first and last two items are what orient you, the middle rarely is.
+ *
+ * `as` takes a router link component, the way CategoryTile does. The default `a`
+ * is right for the showcase and for anywhere outside a router, but inside the SPA a
+ * plain anchor full-page-reloads the app on every crumb — the slowest possible way
+ * to go up one level. Callers pass `as={Link}`; `item.href` is the path either way,
+ * so nothing about the items changes.
  */
-export function Breadcrumb({ items = [], className }) {
+export function Breadcrumb({ items = [], as: As = 'a', className }) {
   const collapse = items.length > 3;
+  // react-router takes `to`, an anchor takes `href`. Same value, different prop.
+  const linkTo = (href) => (As === 'a' ? { href: href ?? '#' } : { to: href ?? '#' });
   return (
     <nav aria-label="Breadcrumb" className={cx('min-w-0', className)}>
       <ol className="flex flex-wrap items-center gap-1.5">
@@ -48,12 +56,12 @@ export function Breadcrumb({ items = [], className }) {
                   {item.label}
                 </span>
               ) : (
-                <a
-                  href={item.href ?? '#'}
+                <As
+                  {...linkTo(item.href)}
                   className="type-body-sm truncate text-fg-secondary underline-offset-2 transition-colors hover:text-brand-700 hover:underline"
                 >
                   {item.label}
-                </a>
+                </As>
               )}
             </li>
           );

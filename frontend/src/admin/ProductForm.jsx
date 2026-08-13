@@ -1,11 +1,14 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
   Alert,
+  Breadcrumb,
   Button,
+  Card,
+  CardBody,
+  CardHeader,
   ErrorState,
   Field,
-  FileDrop,
   FormActions,
   FormRow,
   FormSection,
@@ -15,157 +18,183 @@ import {
   PageHeader,
   Panel,
   Select,
-  Skeleton,
   StatusBadge,
+  StockMeter,
+  Switch,
   Textarea,
+  formatINR,
   stockStatusOf,
   useToast,
 } from '../components/DesignSystem';
-import { post, put, upload } from '../lib/api';
-import { formatINR, paiseToRupees, rupeesToPaise } from '../lib/money';
-import useFetch from '../lib/useFetch';
-import { adminUrl, slugify } from './helpers';
+import { adminUrl, isMoney, paiseToRupees, rupeesToPaise } from './helpers';
+import { productsApi, useAdminStore } from './data';
 
-// New and edit are one component. Every money field here is typed in RUPEES and stored in
-// PAISE — see onSubmit. The inputs hold a plain number string ("240", "240.5"); formatINR
-// output ("₹240.00") must never reach an input value, because parsing it back gives NaN and a
-// thousands separator turns ₹2,480.00 into 200 paise.
+// New and edit are one component, over the same product shape /products renders:
+// code, summary, gst, hsn, uom, packSize, moq, stock, lowStockAt, specs. Saving
+// mutates the shared fixture, so a rename shows up in the catalogue immediately —
+// that is the whole reason both halves read one source.
+//
+// VALIDATION IS INLINE AND ON SUBMIT, never a window.confirm(). A native confirm
+// dialog cannot be styled, cannot be read by the page's own focus management, and
+// puts a decision in a box that looks like a browser malfunction. The MRP check
+// that used to be a confirm() is an Alert beside the field that raised it.
+
+const GST_RATES = [
+  { value: 0, label: '0% — exempt' },
+  { value: 5, label: '5% — merit rate (effectively every surgical good)' },
+  { value: 12, label: '12% — as carried by the current catalogue' },
+  { value: 18, label: '18% — standard rate' },
+];
+
+const UOMS = ['Piece', 'Box', 'Pack', 'Set', 'Roll', 'Vial'];
+
 const blank = {
+  code: '',
   name: '',
-  slug: '',
-  description: '',
-  brand: '',
-  images: [],
+  categorySlug: '',
+  subCategory: '',
+  summary: '',
   price: '',
   mrp: '',
-  gstRate: '5',
-  hsnCode: '',
-  minOrderQty: '1',
-  stockQty: '0',
-  categoryId: '',
-  subcategoryId: '',
+  gst: 12,
+  hsn: '',
+  uom: 'Piece',
+  packSize: '',
+  moq: '1',
+  stock: '0',
+  lowStockAt: '0',
+  status: 'active',
+  sterile: false,
+  latexFree: false,
+  specs: [],
+  applications: [],
+  documents: [],
+  image: null,
 };
+
+/** The store's product → the form's strings. Money becomes rupees exactly once. */
+const toForm = (product) => ({
+  ...blank,
+  ...product,
+  summary: product.summary ?? '',
+  packSize: product.packSize ?? '',
+  price: paiseToRupees(product.price),
+  mrp: product.mrp ? paiseToRupees(product.mrp) : '',
+  gst: product.gst ?? 12,
+  moq: String(product.moq ?? 1),
+  stock: String(product.stock ?? 0),
+  lowStockAt: String(product.lowStockAt ?? 0),
+  specs: product.specs ? product.specs.map(([k, v]) => [k, v]) : [],
+  applications: product.applications ?? [],
+  documents: product.documents ?? [],
+});
 
 export default function AdminProductForm() {
   const { id } = useParams();
   const navigate = useNavigate();
   const toast = useToast();
 
-  const cats = useFetch('/admin/categories');
-  // ponytail: there is no GET /admin/products/:id. The list carries every field, so the edit
-  // form reads its product out of it rather than adding a route. null, not '' — useFetch skips
-  // only on null and would happily GET an empty path.
-  const products = useFetch(id ? '/admin/products' : null);
+  const products = useAdminStore((s) => s.products);
+  const categories = useAdminStore((s) => s.categories);
 
-  const [form, setForm] = useState(blank);
-  const [uploads, setUploads] = useState([]); // per-file: { name, state, message }
+  const existing = id ? products.find((p) => p.id === id) : null;
+
+  const [form, setForm] = useState(() => (existing ? toForm(existing) : { ...blank }));
+  const [submitted, setSubmitted] = useState(false); // errors appear after the first attempt, not while typing
+  const [dirty, setDirty] = useState(false);
   const [busy, setBusy] = useState(false);
 
-  const set = (patch) => setForm((f) => ({ ...f, ...patch }));
-
-  const existing = id && products.data?.find((p) => String(p._id) === id);
-
+  // Re-seed when the route changes to a different product — the component is
+  // reused across /products/:id, and without this, opening one product from
+  // another leaves the previous one's values in the fields.
   useEffect(() => {
-    if (!existing) return;
-    setForm({
-      ...blank,
-      ...existing,
-      brand: existing.brand || '',
-      images: existing.images || [],
-      // Plain number strings — paiseToRupees is the only thing that divides by 100.
-      price: paiseToRupees(existing.price),
-      mrp: existing.mrp ? paiseToRupees(existing.mrp) : '',
-      gstRate: String(existing.gstRate),
-      minOrderQty: String(existing.minOrderQty ?? 1),
-      stockQty: String(existing.stockQty ?? 0),
-      categoryId: String(existing.categoryId || ''),
-      subcategoryId: String(existing.subcategoryId || ''),
-    });
-  }, [existing]);
+    setForm(existing ? toForm(existing) : { ...blank });
+    setSubmitted(false);
+    setDirty(false);
+  }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const loading = cats.loading || products.loading;
-  const loadError = cats.error || products.error;
+  const set = (patch) => {
+    setForm((f) => ({ ...f, ...patch }));
+    setDirty(true);
+  };
 
-  const subcategories =
-    cats.data?.find((c) => String(c._id) === form.categoryId)?.subcategories || [];
+  const category = categories.find((c) => c.slug === form.categorySlug);
+  const subcategories = category?.children ?? [];
 
-  // The Chapter 61/62/63 threshold is on sale value, and prices are stored GST-exclusive, so
-  // the paise figure in this form is the right thing to compare. See docs/GST-REFERENCE.md.
-  const textileHsn = /^6[123]/.test(form.hsnCode.trim());
   const pricePaise = rupeesToPaise(form.price);
+  const mrpPaise = form.mrp.trim() ? rupeesToPaise(form.mrp) : null;
 
-  async function onFiles(files) {
-    if (!files.length) return;
-    setUploads(files.map((f) => ({ name: f.name, state: 'uploading' })));
+  // The Chapter 61/62/63 threshold is on sale value, and prices are stored
+  // GST-exclusive, so the paise figure in this form is the right one to compare.
+  const textileHsn = /^6[123]/.test(form.hsn.trim());
 
-    // ponytail: one POST per file, sequentially. fetch gives no upload progress event, so
-    // "progress" is per-file state; XHR would be the upgrade if a byte-level bar is wanted.
-    for (const [i, file] of files.entries()) {
-      try {
-        const { url } = await upload('/admin/upload', file);
-        setForm((f) => ({ ...f, images: [...f.images, url] }));
-        setUploads((u) => u.map((x, j) => (j === i ? { ...x, state: 'done' } : x)));
-      } catch (err) {
-        setUploads((u) =>
-          u.map((x, j) => (j === i ? { ...x, state: 'error', message: err.message } : x)),
-        );
-      }
-    }
-  }
+  const errors = useMemo(() => {
+    const e = {};
+    if (!form.name.trim()) e.name = 'A product needs a name — it is what the catalogue lists.';
+    if (!form.code.trim()) e.code = 'The product code is how buyers search and how orders reference this.';
+    else if (products.some((p) => p.code.toLowerCase() === form.code.trim().toLowerCase() && p.id !== id))
+      e.code = 'Another product already uses this code.';
+    if (!isMoney(form.price)) e.price = 'Enter a price in rupees, for example 240 or 240.50.';
+    else if (pricePaise <= 0) e.price = 'A price of zero would list this product as free.';
+    if (form.mrp.trim() && !isMoney(form.mrp)) e.mrp = 'Enter an amount in rupees, or leave it blank.';
+    if (!form.hsn.trim()) e.hsn = 'The HSN code is printed on every invoice this product appears on.';
+    else if (!/^\d{4,8}$/.test(form.hsn.trim())) e.hsn = 'Four to eight digits. Eight is safe at any turnover.';
+    if (!form.categorySlug) e.categorySlug = 'Pick where this sits in the catalogue.';
+    if (Number(form.moq) < 1) e.moq = 'The minimum order quantity is at least one.';
+    if (Number(form.stock) < 0) e.stock = 'Stock cannot be negative.';
+    if (Number(form.lowStockAt) < 0) e.lowStockAt = 'A reorder threshold cannot be negative.';
+    return e;
+  }, [form, products, id, pricePaise]);
 
-  function moveImage(index, delta) {
-    setForm((f) => {
-      const images = [...f.images];
-      const target = index + delta;
-      if (target < 0 || target >= images.length) return f;
-      [images[index], images[target]] = [images[target], images[index]];
-      return { ...f, images };
-    });
-  }
+  const errorList = Object.entries(errors);
+  const showError = (key) => (submitted ? errors[key] : undefined);
 
   async function onSubmit(e) {
     e.preventDefault();
-
-    const price = rupeesToPaise(form.price);
-    const mrp = form.mrp.trim() ? rupeesToPaise(form.mrp) : undefined;
-
-    if (price <= 0) {
-      toast.error('Enter a price in rupees, for example 240 or 240.50.');
+    setSubmitted(true);
+    if (errorList.length > 0) {
+      // Focus the first bad field. A summary at the bottom of a nine-field form
+      // that nobody scrolls to is a validation message that was never delivered.
+      document.querySelector('[aria-invalid="true"]')?.focus();
+      toast.error(`${errorList.length} field${errorList.length === 1 ? '' : 's'} need${errorList.length === 1 ? 's' : ''} attention.`);
       return;
     }
-    // An MRP at or below the selling price renders as a 0% discount and looks broken.
-    if (
-      mrp !== undefined &&
-      mrp <= price &&
-      !window.confirm(
-        `MRP ${formatINR(mrp)} is not higher than the price ${formatINR(price)}. The shop will show a 0% discount. Save anyway?`,
-      )
-    )
-      return;
 
-    const body = {
+    const payload = {
+      ...(id ? { id } : {}),
+      code: form.code.trim().toUpperCase(),
       name: form.name.trim(),
-      slug: (form.slug || slugify(form.name)).trim(),
-      description: form.description,
-      brand: form.brand.trim() || undefined,
-      images: form.images,
-      price, // paise
-      ...(mrp !== undefined ? { mrp } : {}),
-      gstRate: Number(form.gstRate),
-      hsnCode: form.hsnCode.trim(),
-      minOrderQty: Number(form.minOrderQty) || 1,
-      stockQty: Number(form.stockQty) || 0,
-      categoryId: form.categoryId,
-      subcategoryId: form.subcategoryId,
+      summary: form.summary.trim(),
+      category: category?.name ?? '',
+      categorySlug: form.categorySlug,
+      subCategory: form.subCategory || '',
+      icon: category?.icon ?? 'products',
+      price: pricePaise,
+      ...(mrpPaise ? { mrp: mrpPaise } : { mrp: undefined }),
+      gst: Number(form.gst),
+      hsn: form.hsn.trim(),
+      uom: form.uom,
+      packSize: form.packSize.trim(),
+      moq: Math.max(1, Number(form.moq) || 1),
+      stock: Math.max(0, Number(form.stock) || 0),
+      lowStockAt: Math.max(0, Number(form.lowStockAt) || 0),
+      status: form.status,
+      sterile: form.sterile,
+      latexFree: form.latexFree,
+      specs: form.specs.filter(([k, v]) => k.trim() || v.trim()),
+      applications: form.applications,
+      documents: form.documents,
+      image: form.image ?? null,
     };
 
     setBusy(true);
     try {
-      const saved = id
-        ? await put(`/admin/products/${id}`, body)
-        : await post('/admin/products', body);
-      toast.success(`Saved. Price stored as ${saved.price} paise — ${formatINR(saved.price)}.`);
-      if (!id) navigate(adminUrl(`/products/${saved._id}`), { replace: true });
+      const saved = await productsApi.save(payload);
+      setDirty(false);
+      toast.success(`Saved "${payload.name}". It is live in the catalogue.`, { title: 'Product saved' });
+      // `replace`, so Back from a just-created product does not return to an empty
+      // New Product form that would create a second one.
+      if (!id) navigate(adminUrl(`/products/${saved.id}`), { replace: true });
     } catch (err) {
       toast.error(err.message);
     } finally {
@@ -173,296 +202,458 @@ export default function AdminProductForm() {
     }
   }
 
-  if (loading)
+  // A stale link to a deleted product is a normal thing to arrive with.
+  if (id && !existing) {
     return (
-      <div className="flex flex-col gap-4">
-        <Skeleton w="w-64" h="h-9" />
-        <Skeleton w="w-full" h="h-96" rounded="rounded-2xl" />
-      </div>
-    );
-
-  if (loadError)
-    return (
-      <Panel>
-        <ErrorState
-          thing="this product"
-          detail={loadError}
-          onRetry={() => {
-            cats.reload();
-            products.reload();
-          }}
+      <>
+        <PageHeader
+          title="Product not found"
+          actions={
+            <Button as={Link} to={adminUrl('/products')} variant="secondary" iconLeft={Icon.arrowLeft}>
+              Back to products
+            </Button>
+          }
         />
-      </Panel>
+        <Panel className="mt-6">
+          <ErrorState
+            title="No product with that id."
+            body="It may have been deleted. The catalogue list has everything currently on the shop."
+          />
+        </Panel>
+      </>
     );
+  }
 
-  if (id && !existing)
-    return (
-      <Panel>
-        <ErrorState title="No product with that id." body="It may have been deleted." />
-      </Panel>
-    );
+  const stockKey = stockStatusOf(Number(form.stock) || 0, Number(form.lowStockAt) || 0);
 
   return (
     <>
       <PageHeader
+        breadcrumb={
+          <Breadcrumb
+            items={[
+              { label: 'Products', href: adminUrl('/products') },
+              { label: id ? (existing?.name ?? 'Edit') : 'New product' },
+            ]}
+          />
+        }
         title={id ? 'Edit product' : 'New product'}
-        subtitle={existing ? existing.name : undefined}
+        subtitle={
+          id
+            ? 'Changes appear in the shop catalogue as soon as they are saved.'
+            : 'Prices are entered in rupees, excluding GST, and stored as paise.'
+        }
+        meta={id && existing ? <StatusBadge kind="entity" value={existing.status} /> : undefined}
         actions={
-          <Button as={Link} to={adminUrl('/products')} variant="secondary" iconLeft={Icon.arrowLeft}>
+          <Button as={Link} to={adminUrl('/products')} variant="tertiary" iconLeft={Icon.arrowLeft}>
             Back to products
           </Button>
         }
       />
 
-      <form onSubmit={onSubmit} className="mt-6 flex flex-col gap-6">
-        <Panel className="px-4 sm:px-6">
-          <FormSection
-            title="Identity"
-            description="Name, URL slug, description and brand — the identifying details shown across the shop and admin lists."
-          >
-            <FormRow columns={2}>
-              <Field label="Name" required>
-                <Input
-                  value={form.name}
-                  onChange={(e) => {
-                    const name = e.target.value;
-                    set(
-                      id || form.slug !== slugify(form.name) ? { name } : { name, slug: slugify(name) },
-                    );
-                  }}
-                />
-              </Field>
-              <Field label="Slug" required helper="Shop URL: /p/your-slug">
-                <Input value={form.slug} onChange={(e) => set({ slug: e.target.value })} />
-              </Field>
-            </FormRow>
+      <form onSubmit={onSubmit} noValidate className="mt-6 flex flex-col gap-6">
+        {/* One summary, above the fields, only once submitting has failed. §14 asks
+            for the error next to the field; this is the count, so a failure below
+            the fold is still visible from the top of the form. */}
+        {submitted && errorList.length > 0 && (
+          <Alert tone="error" title={`${errorList.length} field${errorList.length === 1 ? '' : 's'} need attention`}>
+            Each one is marked below with what it needs.
+          </Alert>
+        )}
 
-            <Field label="Description" required helper="Plain text. Line breaks are kept.">
-              <Textarea
-                rows={5}
-                value={form.description}
-                onChange={(e) => set({ description: e.target.value })}
-              />
-            </Field>
-
-            <FormRow columns={2}>
-              <Field label="Brand" optional helper="Romsons, 3M, Datar — how buyers actually search.">
-                <Input value={form.brand} onChange={(e) => set({ brand: e.target.value })} />
-              </Field>
-              <Field label="HSN code" required helper="Printed on invoices. 8 digits is safe at any turnover.">
-                <Input
-                  className="font-mono"
-                  value={form.hsnCode}
-                  onChange={(e) => set({ hsnCode: e.target.value })}
-                />
-              </Field>
-            </FormRow>
-          </FormSection>
-
-          <FormSection
-            title="Price and tax"
-            description="What the shop charges before GST, the invoice HSN code and the GST rate that applies to it."
-          >
-            <FormRow columns={2}>
-              <Field
-                label="Price (₹, excluding GST)"
-                required
-                helper="Rupees, e.g. 240 or 240.50. Stored as paise."
+        <div className="grid gap-6 lg:grid-cols-3">
+          <div className="flex min-w-0 flex-col gap-6 lg:col-span-2">
+            <Panel className="px-4 py-1 sm:px-6">
+              <FormSection
+                title="Identity"
+                description="What the catalogue lists and what an order references. The code is the field buyers actually type."
               >
-                <Input
-                  prefix="₹"
-                  inputMode="decimal"
-                  value={form.price}
-                  onChange={(e) => set({ price: e.target.value })}
-                />
-              </Field>
-              <Field
-                label="MRP (₹)"
-                optional
-                helper="Struck-through list price beside the selling price. Must be higher than the price to mean anything."
-              >
-                <Input
-                  prefix="₹"
-                  inputMode="decimal"
-                  value={form.mrp}
-                  onChange={(e) => set({ mrp: e.target.value })}
-                />
-              </Field>
-            </FormRow>
-
-            {/* 0, 5, 18 — and nothing else. The 12% slab was abolished on 22 September 2025 by
-                Notification 9/2025-CTR; offering it would emit an invoice at a rate that does not
-                legally exist. docs/GST-REFERENCE.md has the gazette citations. */}
-            <Field
-              label="GST rate"
-              required
-              helper="The rate follows the product's HSN code — confirm it against the current notification before invoicing."
-            >
-              <Select value={form.gstRate} onChange={(e) => set({ gstRate: e.target.value })}>
-                <option value="0">0% — exempt</option>
-                <option value="5">5% — merit rate (effectively every surgical good)</option>
-                <option value="18">18% — standard rate</option>
-              </Select>
-            </Field>
-
-            {textileHsn && (
-              <Alert tone="warning">
-                HSN {form.hsnCode.trim()} is a Chapter 61/62/63 textile — masks, gowns, drapes,
-                caps. Its rate depends on the price per piece: <strong>5% at or below ₹2,500</strong>,{' '}
-                <strong>18% above</strong> it (sale value, i.e. this GST-exclusive figure).
-                {pricePaise > 0 && (
-                  <>
-                    {' '}
-                    At {formatINR(pricePaise)} per piece that points to{' '}
-                    <strong>{pricePaise > 250000 ? '18%' : '5%'}</strong>.
-                  </>
-                )}{' '}
-                A hint, not a rule — you decide.
-              </Alert>
-            )}
-          </FormSection>
-
-          <FormSection
-            title="Stock and ordering"
-            description="How much is on hand, the smallest quantity a buyer can order, and where the product sits in the catalogue."
-          >
-            <FormRow columns={2}>
-              <div>
-                <Field label="Stock quantity" helper="The only stock field there is.">
-                  <Input
-                    type="number"
-                    min="0"
-                    className="font-mono"
-                    value={form.stockQty}
-                    onChange={(e) => set({ stockQty: e.target.value })}
-                  />
-                </Field>
-                <p className="type-caption mt-2 flex items-center gap-2 text-fg-secondary">
-                  Shop shows:{' '}
-                  <StatusBadge kind="stock" value={stockStatusOf(Number(form.stockQty) || 0, 0)} size="sm" /> —
-                  derived from the number, not a separate switch.
-                </p>
-              </div>
-              <Field
-                label="Minimum order quantity"
-                helper="Refused at the shop's quantity stepper, with the reason shown."
-              >
-                <Input
-                  type="number"
-                  min="1"
-                  value={form.minOrderQty}
-                  onChange={(e) => set({ minOrderQty: e.target.value })}
-                />
-              </Field>
-            </FormRow>
-
-            <FormRow columns={2}>
-              <Field label="Category" required>
-                <Select
-                  value={form.categoryId}
-                  // Changing the category clears the subcategory — the old one belongs to another parent.
-                  onChange={(e) => set({ categoryId: e.target.value, subcategoryId: '' })}
-                >
-                  <option value="">Choose a category</option>
-                  {(cats.data || []).map((c) => (
-                    <option key={c._id} value={c._id}>
-                      {c.name}
-                    </option>
-                  ))}
-                </Select>
-              </Field>
-              <Field
-                label="Subcategory"
-                required
-                helper={form.categoryId ? undefined : 'Choose a category first.'}
-              >
-                <Select
-                  disabled={!form.categoryId}
-                  value={form.subcategoryId}
-                  onChange={(e) => set({ subcategoryId: e.target.value })}
-                >
-                  <option value="">Choose a subcategory</option>
-                  {subcategories.map((s) => (
-                    <option key={s._id} value={s._id}>
-                      {s.name}
-                    </option>
-                  ))}
-                </Select>
-              </Field>
-            </FormRow>
-          </FormSection>
-
-          <FormSection
-            title="Images"
-            description="The first image is the thumbnail everywhere on the shop — cards, cart, orders. Use the arrows to change which one that is."
-          >
-            <FileDrop accept="image/*" multiple onAdd={onFiles} hint="JPG or PNG · any size" />
-
-            {uploads.length > 0 && (
-              <ul className="flex flex-col gap-1">
-                {uploads.map((u, i) => (
-                  <li
-                    key={`${u.name}-${i}`}
-                    className={`type-caption ${u.state === 'error' ? 'text-error-700' : 'text-fg-secondary'}`}
+                <FormRow columns={2}>
+                  <Field label="Name" required error={showError('name')}>
+                    <Input value={form.name} onChange={(e) => set({ name: e.target.value })} />
+                  </Field>
+                  <Field
+                    label="Product code"
+                    required
+                    error={showError('code')}
+                    helper="Unique. Shown on the card, the order and the invoice."
                   >
-                    {u.name} — {u.state === 'uploading' ? 'uploading…' : u.state === 'done' ? 'uploaded' : u.message}
-                  </li>
-                ))}
-              </ul>
-            )}
-
-            {form.images.length > 0 && (
-              <ul className="flex flex-wrap gap-3">
-                {form.images.map((src, i) => (
-                  <li key={src} className="w-28">
-                    <img
-                      src={src}
-                      alt=""
-                      className="aspect-square w-full rounded-lg border border-edge bg-white object-contain p-1"
+                    <Input
+                      className="font-mono uppercase"
+                      value={form.code}
+                      onChange={(e) => set({ code: e.target.value })}
+                      placeholder="AST-IV-1001"
                     />
-                    <p className="type-caption mt-1 text-fg-secondary">
-                      {i === 0 ? 'Thumbnail' : `Image ${i + 1}`}
-                    </p>
-                    <div className="mt-1 flex items-center gap-1">
-                      <IconButton
-                        icon={Icon.chevronLeft}
-                        label={`Move image ${i + 1} earlier`}
-                        size="sm"
-                        onClick={() => moveImage(i, -1)}
-                        disabled={i === 0}
-                      />
-                      <IconButton
-                        icon={Icon.chevronRight}
-                        label={`Move image ${i + 1} later`}
-                        size="sm"
-                        onClick={() => moveImage(i, 1)}
-                        disabled={i === form.images.length - 1}
-                      />
-                      <IconButton
-                        icon={Icon.delete}
-                        label={`Remove image ${i + 1}`}
-                        size="sm"
-                        onClick={() =>
-                          setForm((f) => ({ ...f, images: f.images.filter((_, j) => j !== i) }))
-                        }
-                      />
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </FormSection>
-        </Panel>
+                  </Field>
+                </FormRow>
 
-        {/* Not sticky. FormActions' sticky variant sits on bg-surface/95, and over this
-            form's own white panel the section underneath stays legible through it — it reads
-            as a rendering fault rather than a floating bar. Categories and Settings both end
-            with a plain action bar, so this matches them. */}
-        <FormActions>
+                <Field
+                  label="Summary"
+                  optional
+                  helper="One or two sentences. It is the description under the name on the product card."
+                >
+                  <Textarea rows={3} value={form.summary} onChange={(e) => set({ summary: e.target.value })} />
+                </Field>
+
+                <FormRow columns={2}>
+                  <Field label="Category" required error={showError('categorySlug')}>
+                    <Select
+                      value={form.categorySlug}
+                      // Changing the category clears the subcategory — the old one
+                      // belongs to a different parent and would render as a
+                      // breadcrumb that does not exist.
+                      onChange={(e) => set({ categorySlug: e.target.value, subCategory: '' })}
+                    >
+                      <option value="">Choose a category</option>
+                      {categories.map((c) => (
+                        <option key={c.slug} value={c.slug}>
+                          {c.name}
+                        </option>
+                      ))}
+                    </Select>
+                  </Field>
+                  <Field
+                    label="Subcategory"
+                    optional
+                    helper={
+                      !form.categorySlug
+                        ? 'Choose a category first.'
+                        : subcategories.length === 0
+                          ? `${category.name} has no subcategories.`
+                          : undefined
+                    }
+                  >
+                    <Select
+                      disabled={!form.categorySlug || subcategories.length === 0}
+                      value={form.subCategory}
+                      onChange={(e) => set({ subCategory: e.target.value })}
+                    >
+                      <option value="">None</option>
+                      {subcategories.map((s) => (
+                        <option key={s.slug} value={s.name}>
+                          {s.name}
+                        </option>
+                      ))}
+                    </Select>
+                  </Field>
+                </FormRow>
+              </FormSection>
+
+              <FormSection
+                title="Price and tax"
+                description="What the shop charges before GST, the invoice HSN code, and the rate that applies to it."
+              >
+                <FormRow columns={2}>
+                  <Field
+                    label="Price, excluding GST"
+                    required
+                    error={showError('price')}
+                    helper={
+                      showError('price') ? undefined : 'Rupees, e.g. 240 or 240.50. Stored as paise.'
+                    }
+                  >
+                    <Input
+                      prefix="₹"
+                      inputMode="decimal"
+                      value={form.price}
+                      onChange={(e) => set({ price: e.target.value })}
+                    />
+                  </Field>
+                  <Field
+                    label="MRP"
+                    optional
+                    error={showError('mrp')}
+                    helper={showError('mrp') ? undefined : 'The struck-through list price beside the selling price.'}
+                  >
+                    <Input
+                      prefix="₹"
+                      inputMode="decimal"
+                      value={form.mrp}
+                      onChange={(e) => set({ mrp: e.target.value })}
+                    />
+                  </Field>
+                </FormRow>
+
+                {/* Was a window.confirm() on submit. An MRP at or below the price
+                    renders as a 0% discount, which looks broken on the card — so it
+                    is worth saying, and it is not worth blocking a save over. */}
+                {mrpPaise !== null && pricePaise > 0 && mrpPaise <= pricePaise && (
+                  <Alert tone="warning" title="The MRP is not above the price">
+                    At {formatINR(mrpPaise)} against {formatINR(pricePaise)} the shop shows a 0%
+                    discount and the struck-through figure reads as a mistake. Leave the MRP blank to
+                    show the price on its own.
+                  </Alert>
+                )}
+
+                <FormRow columns={2}>
+                  <Field
+                    label="GST rate"
+                    required
+                    helper="The rate follows the HSN code. Confirm it against the current notification before invoicing."
+                  >
+                    <Select value={form.gst} onChange={(e) => set({ gst: Number(e.target.value) })}>
+                      {GST_RATES.map((r) => (
+                        <option key={r.value} value={r.value}>
+                          {r.label}
+                        </option>
+                      ))}
+                    </Select>
+                  </Field>
+                  <Field
+                    label="HSN code"
+                    required
+                    error={showError('hsn')}
+                    helper={showError('hsn') ? undefined : 'Printed on invoices. Eight digits is safe at any turnover.'}
+                  >
+                    <Input
+                      className="font-mono"
+                      inputMode="numeric"
+                      value={form.hsn}
+                      onChange={(e) => set({ hsn: e.target.value })}
+                      placeholder="90183930"
+                    />
+                  </Field>
+                </FormRow>
+
+                {textileHsn && (
+                  <Alert tone="info" title="This HSN is a textile chapter">
+                    HSN {form.hsn.trim()} is Chapter 61/62/63 — masks, gowns, drapes, caps. The rate
+                    depends on price per piece: <strong>5% at or below ₹2,500</strong>,{' '}
+                    <strong>18% above</strong> it, measured on this GST-exclusive figure.
+                    {pricePaise > 0 && (
+                      <>
+                        {' '}
+                        At {formatINR(pricePaise)} that points to{' '}
+                        <strong>{pricePaise > 250000 ? '18%' : '5%'}</strong>.
+                      </>
+                    )}{' '}
+                    A hint, not a rule — you decide.
+                  </Alert>
+                )}
+              </FormSection>
+
+              <FormSection
+                title="Ordering and stock"
+                description="How it is sold, the smallest quantity a buyer can order, and how much is on hand."
+              >
+                <FormRow columns={3}>
+                  <Field label="Unit of measure" required>
+                    <Select value={form.uom} onChange={(e) => set({ uom: e.target.value })}>
+                      {UOMS.map((u) => (
+                        <option key={u} value={u}>
+                          {u}
+                        </option>
+                      ))}
+                    </Select>
+                  </Field>
+                  <Field label="Pack size" optional helper="As printed on the carton.">
+                    <Input
+                      value={form.packSize}
+                      onChange={(e) => set({ packSize: e.target.value })}
+                      placeholder="100 pcs / box"
+                    />
+                  </Field>
+                  <Field
+                    label="Minimum order quantity"
+                    required
+                    error={showError('moq')}
+                    helper={showError('moq') ? undefined : "The shop's stepper counts in multiples of this."}
+                  >
+                    <Input
+                      type="number"
+                      min="1"
+                      className="tabular"
+                      value={form.moq}
+                      onChange={(e) => set({ moq: e.target.value })}
+                    />
+                  </Field>
+                </FormRow>
+
+                <FormRow columns={2}>
+                  <Field label="Stock on hand" required error={showError('stock')}>
+                    <Input
+                      type="number"
+                      min="0"
+                      className="tabular"
+                      value={form.stock}
+                      onChange={(e) => set({ stock: e.target.value })}
+                    />
+                  </Field>
+                  <Field
+                    label="Reorder threshold"
+                    required
+                    error={showError('lowStockAt')}
+                    helper={
+                      showError('lowStockAt')
+                        ? undefined
+                        : 'At or below this, the product is badged Low Stock and appears in the dashboard queue.'
+                    }
+                  >
+                    <Input
+                      type="number"
+                      min="0"
+                      className="tabular"
+                      value={form.lowStockAt}
+                      onChange={(e) => set({ lowStockAt: e.target.value })}
+                    />
+                  </Field>
+                </FormRow>
+
+                {/* The two numbers above, as the buyer will meet them. Derived, so
+                    there is no separate switch to get out of step with the count. */}
+                <div className="rounded-xl bg-surface-2 p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <p className="type-caption text-fg-secondary">The shop will show</p>
+                    <StatusBadge kind="stock" value={stockKey} size="sm" />
+                  </div>
+                  <StockMeter
+                    className="mt-3"
+                    stock={Number(form.stock) || 0}
+                    lowStockAt={Number(form.lowStockAt) || 0}
+                  />
+                </div>
+              </FormSection>
+
+              <FormSection
+                title="Specifications"
+                description="The key-specification table on the product page. Rows appear in the order they are listed here."
+              >
+                {form.specs.length === 0 ? (
+                  <p className="type-body-sm text-fg-secondary">
+                    No specifications yet. A buyer comparing three infusion sets is reading this
+                    table, so it is worth filling in.
+                  </p>
+                ) : (
+                  <ul className="flex flex-col gap-3">
+                    {form.specs.map(([key, value], i) => (
+                      <li key={i} className="flex flex-wrap items-end gap-3">
+                        <div className="min-w-40 flex-1">
+                          <Field label={i === 0 ? 'Specification' : undefined} htmlFor={`spec-key-${i}`}>
+                            <Input
+                              id={`spec-key-${i}`}
+                              aria-label={`Specification ${i + 1} name`}
+                              value={key}
+                              onChange={(e) =>
+                                set({ specs: form.specs.map((s, j) => (j === i ? [e.target.value, s[1]] : s)) })
+                              }
+                              placeholder="Tube length"
+                            />
+                          </Field>
+                        </div>
+                        <div className="min-w-40 flex-1">
+                          <Field label={i === 0 ? 'Value' : undefined} htmlFor={`spec-value-${i}`}>
+                            <Input
+                              id={`spec-value-${i}`}
+                              aria-label={`Specification ${i + 1} value`}
+                              value={value}
+                              onChange={(e) =>
+                                set({ specs: form.specs.map((s, j) => (j === i ? [s[0], e.target.value] : s)) })
+                              }
+                              placeholder="150 cm"
+                            />
+                          </Field>
+                        </div>
+                        <IconButton
+                          icon={Icon.delete}
+                          label={`Remove specification ${i + 1}${key ? `, ${key}` : ''}`}
+                          onClick={() => set({ specs: form.specs.filter((_, j) => j !== i) })}
+                          className="mb-0.5 text-error-700"
+                        />
+                      </li>
+                    ))}
+                  </ul>
+                )}
+
+                <div>
+                  <Button
+                    variant="secondary"
+                    type="button"
+                    iconLeft={Icon.add}
+                    onClick={() => set({ specs: [...form.specs, ['', '']] })}
+                  >
+                    Add specification
+                  </Button>
+                </div>
+              </FormSection>
+            </Panel>
+          </div>
+
+          <div className="flex min-w-0 flex-col gap-6">
+            <Card padding="none">
+              <CardHeader title="Listing" icon={Icon.tag} />
+              <CardBody className="flex flex-col gap-5">
+                <Field
+                  label="Status"
+                  helper="Only active products appear in the shop catalogue."
+                >
+                  <Select value={form.status} onChange={(e) => set({ status: e.target.value })}>
+                    <option value="active">Active</option>
+                    <option value="inactive">Inactive</option>
+                    <option value="discontinued">Discontinued</option>
+                  </Select>
+                </Field>
+
+                {/* Switch hands its onChange the next boolean, not an event — it is
+                    a role="switch" button, not a checkbox input. */}
+                <Switch
+                  label="Sterile"
+                  description="Shown as a trust signal on the product page."
+                  checked={form.sterile}
+                  onChange={(next) => set({ sterile: next })}
+                />
+                <Switch
+                  label="Latex-free"
+                  description="Clinically relevant, so it is stated rather than implied."
+                  checked={form.latexFree}
+                  onChange={(next) => set({ latexFree: next })}
+                />
+              </CardBody>
+            </Card>
+
+            <Card padding="none">
+              <CardHeader title="Photograph" icon={Icon.noImage} />
+              <CardBody>
+                {/* No uploader. There is no storage behind this build, and a file
+                    picker that appears to accept an image and silently discards it
+                    is worse than not offering one. The catalogue's placeholder holds
+                    the exact aspect ratio the real photograph will occupy. */}
+                <p className="type-body-sm text-fg-secondary">
+                  Product photography is not wired up in this build. Until it is, the catalogue shows
+                  the category glyph and the product code in the space the photograph will take —
+                  same position, same aspect ratio, so adding photographs later changes no layout.
+                </p>
+              </CardBody>
+            </Card>
+
+            {id && existing && (
+              <Card padding="none">
+                <CardHeader title="In the shop" icon={Icon.externalLink} />
+                <CardBody className="flex flex-col gap-3">
+                  <p className="type-body-sm text-fg-secondary">
+                    See this product the way a buyer does, with the price, the stock badge and the
+                    specification table as they render.
+                  </p>
+                  <Button
+                    as="a"
+                    href={`/products?q=${encodeURIComponent(existing.code)}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    variant="secondary"
+                    iconRight={Icon.externalLink}
+                  >
+                    Open in the catalogue
+                  </Button>
+                </CardBody>
+              </Card>
+            )}
+          </div>
+        </div>
+
+        <FormActions note={dirty ? 'Unsaved changes' : undefined}>
           <Button as={Link} to={adminUrl('/products')} variant="secondary">
             Cancel
           </Button>
-          <Button type="submit" loading={busy}>
+          <Button type="submit" loading={busy} loadingLabel="Saving…">
             {id ? 'Save changes' : 'Create product'}
           </Button>
         </FormActions>

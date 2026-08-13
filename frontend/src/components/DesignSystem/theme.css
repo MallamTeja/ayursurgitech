@@ -1,6 +1,6 @@
 /* =============================================================================
-   AyursurgiTech Design System v1.0 — "Clinical Precision"
-   The token layer. docs/AyursurgiTech-Design-System-v1.0.md is the contract;
+   AayursurgiTech Design System v1.0 — "Clinical Precision"
+   The token layer. docs/AayursurgiTech-Design-System-v1.0.md is the contract;
    every value below traces to a § in it, and nothing here is invented without
    a comment saying why.
 
@@ -365,6 +365,54 @@
   .density-compact {
     --row-h: 2.5rem;
     --row-px: 0.75rem;
+  }
+}
+
+/* =============================================================================
+   PRINT
+   An order screen gets printed — it is what goes to the packing bench, and it is
+   the one place a screen leaves the screen. Without these rules the printout
+   carries the navy sidebar as a full-bleed block of ink down the left margin, and
+   every control that cannot be used on paper.
+
+   Opt in per element rather than out: `.print-hide` on chrome and controls,
+   `.print-full` on the region that should take the whole width once the sidebar
+   is gone. Anything unmarked prints as it renders.
+   ============================================================================= */
+
+@media print {
+  .print-hide {
+    display: none !important;
+  }
+
+  .print-full {
+    /* The main column is a flex child beside the sidebar on screen. With the
+       sidebar gone it has to reclaim the width, or the content prints into the
+       column the sidebar used to leave it. */
+    width: 100% !important;
+    max-width: none !important;
+    padding: 0 !important;
+  }
+
+  .ds-root {
+    /* Colour-managed tints cost toner and print as grey mud on a mono laser.
+       The text is what is being printed. */
+    background: #fff !important;
+  }
+
+  /* A card border survives; its shadow does not — a printed shadow is a grey
+     smear along two edges. */
+  .ds-root [class*='shadow-'] {
+    box-shadow: none !important;
+  }
+
+  /* A table that has to be read row by row must not break mid-row, and its
+     header should repeat on the second page. */
+  .ds-root tr {
+    break-inside: avoid;
+  }
+  .ds-root thead {
+    display: table-header-group;
   }
 }
 

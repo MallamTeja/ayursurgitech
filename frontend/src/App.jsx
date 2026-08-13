@@ -59,7 +59,7 @@ const AdminSettings = lazy(() => import('./admin/Settings'));
 // pages it wraps.
 const AdminShell = lazy(() => import('./admin/AdminShell'));
 
-// The Design System v1.0 reference site — docs/AyursurgiTech-Design-System-v1.0.md
+// The Design System v1.0 reference site — docs/AayursurgiTech-Design-System-v1.0.md
 // made live. Lazy, and it owns its own nested routes, so neither the component
 // library nor lucide-react reaches a shopper's bundle.
 const DesignSystem = lazy(() => import('./components/DesignSystem/showcase/DesignSystemApp'));

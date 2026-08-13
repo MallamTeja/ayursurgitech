@@ -135,7 +135,7 @@ export default function DesignSystemApp() {
             </span>
             <div className="min-w-0">
               <p className="type-body-sm font-semibold leading-tight text-brand-900">
-                Ayursurgi<span className="text-brand-600">Tech</span> Design System
+                Aayursurgi<span className="text-brand-600">Tech</span> Design System
               </p>
               <p className="type-caption leading-tight text-fg-secondary">v1.0 · Clinical Precision</p>
             </div>
@@ -202,7 +202,7 @@ export default function DesignSystemApp() {
 
             <footer className="mt-20 border-t border-edge pt-6">
               <p className="type-caption text-fg-secondary">
-                Built from docs/AyursurgiTech-Design-System-v1.0.md. Where this system departs from that document, the
+                Built from docs/AayursurgiTech-Design-System-v1.0.md. Where this system departs from that document, the
                 departure is labelled on the page and the reason is in the source comments.
               </p>
             </footer>

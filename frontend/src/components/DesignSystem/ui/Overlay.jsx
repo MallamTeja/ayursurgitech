@@ -128,6 +128,11 @@ export function Modal({
  *    genuinely ambiguous.
  *  - destructive confirmations use the danger variant, and the safe choice is
  *    the one that gets focus.
+ *
+ * `confirmDisabled` is for a confirmation that cannot be granted — deleting a
+ * category that still has products in it. The alternative is a button that only
+ * ever produces an error toast, which makes the reader click it to find out what
+ * the dialog could have told them.
  */
 export function ConfirmModal({
   open,
@@ -138,6 +143,7 @@ export function ConfirmModal({
   confirmLabel = 'Confirm',
   cancelLabel = 'Cancel',
   destructive = false,
+  confirmDisabled = false,
   loading = false,
 }) {
   const cancelRef = useRef(null);
@@ -159,6 +165,7 @@ export function ConfirmModal({
           <Button
             variant={destructive ? 'danger' : 'primary'}
             onClick={onConfirm}
+            disabled={confirmDisabled}
             loading={loading}
             loadingLabel="Working…"
           >

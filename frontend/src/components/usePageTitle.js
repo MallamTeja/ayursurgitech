@@ -7,7 +7,7 @@ import { useEffect } from 'react';
 export default function usePageTitle(title) {
   useEffect(() => {
     if (!title) return; // pages that title themselves from fetched data wait for it
-    document.title = `${title} — AyurSurgiTech`;
+    document.title = `${title} — AayursurgiTech`;
     const announcer = document.getElementById('route-announcer');
     if (announcer) announcer.textContent = title;
   }, [title]);

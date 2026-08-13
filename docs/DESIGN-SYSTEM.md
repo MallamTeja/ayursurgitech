@@ -1,4 +1,4 @@
-# AyurSurgiTech — Design System
+# AayursurgiTech — Design System
 
 Direction: **Clinical Navy.** Deep navy primary, white page, muted copper accent.
 

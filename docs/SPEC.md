@@ -1,4 +1,4 @@
-# AyurSurgiTech — Specification
+# AayursurgiTech — Specification
 
 Ecommerce site for surgical pharma products, with an admin panel.
 Single source of truth. Every build prompt references this file. If code and this

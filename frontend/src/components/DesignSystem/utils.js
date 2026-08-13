@@ -22,5 +22,5 @@ export const a11yWarn = (condition, message) => {
   if (condition || import.meta.env.PROD || warned.has(message)) return;
   warned.add(message);
   // eslint-disable-next-line no-console
-  console.warn(`[AyursurgiTech DS] ${message}`);
+  console.warn(`[AayursurgiTech DS] ${message}`);
 };

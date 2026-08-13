@@ -11,7 +11,7 @@ export default function Overview() {
     <Page
       eyebrow="Design System v1.0"
       title="Clinical Precision"
-      intro="The visual contract for AyursurgiTech — a B2B medical-device commerce and distribution platform. This site is the implementation of docs/AyursurgiTech-Design-System-v1.0.md: every token, component and rule below traces to a section of that document, and every place this implementation departs from it is labelled."
+      intro="The visual contract for AayursurgiTech — a B2B medical-device commerce and distribution platform. This site is the implementation of docs/AayursurgiTech-Design-System-v1.0.md: every token, component and rule below traces to a section of that document, and every place this implementation departs from it is labelled."
       spec="§1, §2, §33, §34"
     >
       <Section
@@ -155,7 +155,7 @@ export default function Overview() {
         <Card>
           <ul className="space-y-2.5">
             {[
-              'Photography. §22 wants real Ayursurgi product images; placeholders hold the exact aspect ratio until they exist.',
+              'Photography. §22 wants real Aayursurgi product images; placeholders hold the exact aspect ratio until they exist.',
               'Dark mode. The document is silent on it and this system is light-only by decision, not by omission — see Colour.',
               'A charting library. Four SVG primitives cover §20; axes, zoom and brushing are the point to reconsider.',
               'Data. Every screen here runs on dummy.js. Nothing in this folder calls the API.',

@@ -195,7 +195,7 @@ export default function Cards() {
 
         <Decision kind="change" title="No photography, and the placeholder is deliberate">
           <p>
-            §22 ranks actual Ayursurgi product photography first and explicitly rejects generic stock imagery, so this
+            §22 ranks actual Aayursurgi product photography first and explicitly rejects generic stock imagery, so this
             system ships none rather than the wrong kind. The placeholder holds the exact 4:3 box the real photo will
             occupy — dropping photography in later changes no layout — and shows the category glyph and product code so the
             card stays identifiable. It doubles as the missing-image state the catalogue needs permanently, for a product

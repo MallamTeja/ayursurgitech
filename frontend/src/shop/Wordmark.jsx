@@ -30,7 +30,7 @@ export default function Wordmark({ tone = 'light', className }) {
       {/* §6 permits no second family, so the brand voice comes from weight and
           tracking rather than from a display face. */}
       <span className={cx('type-h4 tracking-tight', dark ? 'text-white' : 'text-brand-900')}>
-        Ayursurgi<span className={dark ? 'text-brand-500' : 'text-brand-600'}>Tech</span>
+        Aayursurgi<span className={dark ? 'text-brand-500' : 'text-brand-600'}>Tech</span>
       </span>
     </Link>
   );

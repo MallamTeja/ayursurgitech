@@ -1,6 +1,6 @@
-# AyursurgiTech Design System v1.0 — "Clinical Precision"
+# AayursurgiTech Design System v1.0 — "Clinical Precision"
 
-The implementation of [`docs/AyursurgiTech-Design-System-v1.0.md`](../../../../docs/AyursurgiTech-Design-System-v1.0.md).
+The implementation of [`docs/AayursurgiTech-Design-System-v1.0.md`](../../../../docs/AayursurgiTech-Design-System-v1.0.md).
 Every token, component and rule here traces to a § of that document, and every place
 this implementation departs from it says so in a comment and on the reference page.
 

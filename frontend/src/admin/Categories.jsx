@@ -1,87 +1,127 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import {
+  Alert,
   Button,
   ConfirmModal,
   DataTable,
   EmptyState,
-  ErrorState,
   Field,
-  FileDrop,
   FormActions,
   FormRow,
   FormSection,
   Icon,
+  IconButton,
   Input,
+  Modal,
   PageHeader,
-  Panel,
+  Select,
+  formatQty,
   useToast,
 } from '../components/DesignSystem';
-import { del, post, put, upload } from '../lib/api';
-import useFetch from '../lib/useFetch';
-import { slugify } from './helpers';
+import { adminUrl, slugify } from './helpers';
+import { categoriesApi, productCountOf, useAdminStore } from './data';
 
-const blank = { name: '', slug: '', image: '', order: 0, subcategories: [] };
+// The §12 taxonomy: two levels, subcategories edited inside their parent.
+//
+// THE FORM IS A MODAL, not a panel that pushes the table down.
+//
+// It used to open above the list, which moved every row 400px down the moment you
+// clicked Edit — so the row you were aiming at was no longer under your cursor, and
+// on a phone the form opened off-screen with no indication anything had happened.
+// A modal keeps the table where it is, traps focus, closes on Esc, and makes
+// "which category am I editing" unambiguous because its title says so.
+
+const blankCategory = { name: '', slug: '', icon: 'products', children: [] };
+
+// The glyph a category carries into the shop's nav and its catalogue tiles. This is
+// the icon set the fixture already uses, so a new category looks like the six that
+// shipped rather than falling back to a generic box.
+const ICON_CHOICES = [
+  { value: 'infusion', label: 'Infusion' },
+  { value: 'vitals', label: 'Vitals / lines' },
+  { value: 'lab', label: 'Lab / connectors' },
+  { value: 'clinical', label: 'Clinical' },
+  { value: 'pharma', label: 'Pharma / vials' },
+  { value: 'wound', label: 'Wound care' },
+  { value: 'products', label: 'Generic' },
+];
 
 export default function AdminCategories() {
-  const list = useFetch('/admin/categories');
-  const [form, setForm] = useState(null); // null = the form is closed
-  const [busy, setBusy] = useState(false);
-  const [confirming, setConfirming] = useState(null); // the category a delete is pending confirmation for
-  const [deleting, setDeleting] = useState(false);
+  const categories = useAdminStore((s) => s.categories);
+  const products = useAdminStore((s) => s.products);
   const toast = useToast();
 
-  const set = (patch) => setForm((f) => ({ ...f, ...patch }));
+  const [form, setForm] = useState(null); // null = the modal is closed
+  const [submitted, setSubmitted] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [confirming, setConfirming] = useState(null);
+  const [deleting, setDeleting] = useState(false);
+
+  const editing = Boolean(form?.original);
 
   function open(category) {
-    // A copy, so cancelling leaves the row on screen untouched.
-    setForm(category ? { ...category, subcategories: [...category.subcategories] } : { ...blank });
+    // A copy, so cancelling leaves the row on screen untouched. `original` is kept
+    // separately because the slug is the key a save writes against and the field
+    // itself is editable.
+    setForm(
+      category
+        ? { ...category, children: category.children.map((c) => ({ ...c })), original: category.slug }
+        : { ...blankCategory, original: null },
+    );
+    setSubmitted(false);
   }
 
-  function setSub(index, patch) {
-    setForm((f) => ({
-      ...f,
-      subcategories: f.subcategories.map((s, i) => (i === index ? { ...s, ...patch } : s)),
-    }));
-  }
+  const set = (patch) => setForm((f) => ({ ...f, ...patch }));
+  const setChild = (index, patch) =>
+    setForm((f) => ({ ...f, children: f.children.map((c, i) => (i === index ? { ...c, ...patch } : c)) }));
 
-  async function onImage(file) {
-    if (!file) return;
-    setBusy(true);
-    try {
-      const { url } = await upload('/admin/upload', file);
-      set({ image: url });
-    } catch (err) {
-      toast.error(err.message);
-    } finally {
-      setBusy(false);
-    }
-  }
+  const slugTaken =
+    form &&
+    categories.some((c) => c.slug === (form.slug || slugify(form.name)) && c.slug !== form.original);
+
+  const errors = form
+    ? {
+        name: !form.name.trim() ? 'A category needs a name — it is the label in the shop nav.' : null,
+        slug: !(form.slug || slugify(form.name))
+          ? 'A slug is needed for the shop URL.'
+          : slugTaken
+            ? 'Another category already uses this slug.'
+            : null,
+      }
+    : {};
+  const invalid = Object.values(errors).some(Boolean);
+  const showError = (key) => (submitted ? errors[key] : undefined);
 
   async function onSave(e) {
     e.preventDefault();
+    setSubmitted(true);
+    if (invalid) return;
+
     setBusy(true);
-    // The whole subcategories array goes back on the parent — that is how SPEC.md defines
-    // editing them. Existing rows keep their _id, because products reference it.
-    const body = {
-      name: form.name.trim(),
+    // The whole children array goes back on the parent — that is how §12 defines
+    // editing them. Blank rows are dropped rather than saved as nameless entries.
+    const payload = {
       slug: (form.slug || slugify(form.name)).trim(),
-      image: form.image || undefined,
-      order: Number(form.order) || 0,
-      subcategories: form.subcategories
-        .filter((s) => s.name.trim())
-        .map((s) => ({
-          ...(s._id ? { _id: s._id } : {}),
-          name: s.name.trim(),
-          slug: (s.slug || slugify(s.name)).trim(),
+      name: form.name.trim(),
+      icon: form.icon,
+      children: form.children
+        .filter((c) => c.name.trim())
+        .map((c) => ({
+          slug: (c.slug || slugify(c.name)).trim(),
+          name: c.name.trim(),
+          // The count is what the shop's nav prints beside the subcategory. It is
+          // carried through rather than recomputed, because nothing in this build
+          // assigns products to a subcategory by slug.
+          count: c.count ?? 0,
         })),
+      count: productCountOf(products, (form.slug || slugify(form.name)).trim()),
     };
 
     try {
-      if (form._id) await put(`/admin/categories/${form._id}`, body);
-      else await post('/admin/categories', body);
+      await categoriesApi.save(payload);
       setForm(null);
-      list.reload();
-      toast.success(`Saved "${body.name}".`);
+      toast.success(`Saved "${payload.name}".`, { title: editing ? 'Category updated' : 'Category created' });
     } catch (err) {
       toast.error(err.message);
     } finally {
@@ -93,12 +133,12 @@ export default function AdminCategories() {
     const category = confirming;
     setDeleting(true);
     try {
-      await del(`/admin/categories/${category._id}`);
-      list.reload();
+      await categoriesApi.remove(category.slug);
       setConfirming(null);
       toast.success(`Deleted "${category.name}".`);
     } catch (err) {
-      // 409 carries the real reason — "12 products still in it" — so it is shown verbatim.
+      // The refusal carries the real reason — "12 products still in it" — so it is
+      // shown verbatim rather than flattened to "could not delete".
       toast.error(err.message);
     } finally {
       setDeleting(false);
@@ -106,27 +146,81 @@ export default function AdminCategories() {
   }
 
   const columns = [
-    { key: 'name', header: 'Name', primary: true, render: (c) => <span className="font-medium text-fg">{c.name}</span> },
-    { key: 'slug', header: 'Slug', className: 'font-mono text-xs text-fg-secondary', render: (c) => c.slug },
     {
-      key: 'subcategories',
-      header: 'Subcategories',
-      render: (c) => (
-        <span>
-          {c.subcategories.length}
-          {c.subcategories.length > 0 && (
-            <span className="ml-2 text-xs text-fg-muted">{c.subcategories.map((s) => s.name).join(', ')}</span>
-          )}
-        </span>
-      ),
+      key: 'name',
+      header: 'Category',
+      primary: true,
+      sortable: true,
+      render: (c) => {
+        const Glyph = Icon[c.icon] ?? Icon.products;
+        return (
+          <span className="flex min-w-0 items-center gap-2.5">
+            <span aria-hidden="true" className="grid size-8 shrink-0 place-items-center rounded-lg bg-brand-50 text-brand-700">
+              <Glyph size={16} />
+            </span>
+            <span className="min-w-0">
+              <span className="block truncate font-medium text-fg">{c.name}</span>
+              <span className="type-caption block truncate font-mono text-fg-muted">/c/{c.slug}</span>
+            </span>
+          </span>
+        );
+      },
     },
-    { key: 'products', header: 'Products', align: 'right', render: (c) => c.productCount },
+    {
+      key: 'children',
+      header: 'Subcategories',
+      render: (c) =>
+        c.children.length === 0 ? (
+          <span className="text-fg-muted">None</span>
+        ) : (
+          <span className="block max-w-md">
+            <span className="tabular font-medium text-fg">{c.children.length}</span>
+            <span className="type-caption mt-0.5 block text-fg-secondary">
+              {c.children.map((s) => s.name).join(' · ')}
+            </span>
+          </span>
+        ),
+    },
+    {
+      key: 'products',
+      header: 'In the shop',
+      align: 'right',
+      sortable: true,
+      // Counted from the products themselves, active only — the same rule the shop's
+      // own category counts use, so the two never disagree. Anything not active is
+      // reported on the line below rather than folded into the figure, because it is
+      // not in the shop and the column says "In the shop".
+      render: (c) => {
+        const live = productCountOf(products, c.slug);
+        const hidden = productCountOf(products, c.slug, { all: true }) - live;
+        return (
+          <span className="inline-flex flex-col items-end">
+            {live === 0 ? (
+              <span className="text-fg-muted">0</span>
+            ) : (
+              <Link
+                to={adminUrl(`/products?cat=${c.slug}`)}
+                className="tabular font-medium text-brand-700 underline-offset-2 hover:underline"
+                aria-label={`View the ${live} product${live === 1 ? '' : 's'} listed in ${c.name}`}
+              >
+                {formatQty(live)}
+              </Link>
+            )}
+            {hidden > 0 && (
+              <span className="type-caption tabular text-fg-muted">
+                +{formatQty(hidden)} not listed
+              </span>
+            )}
+          </span>
+        );
+      },
+    },
     {
       key: 'actions',
       header: '',
       align: 'right',
-      // Every row's button reads as plain "Edit" / "Delete" in a screen reader's control
-      // list, so each one names its category.
+      // Every row's button reads as a bare "Edit" / "Delete" in a screen reader's
+      // control list, so each one names its category.
       render: (c) => (
         <span className="inline-flex items-center justify-end gap-1">
           <Button variant="tertiary" size="sm" onClick={() => open(c)} aria-label={`Edit ${c.name}`}>
@@ -146,11 +240,15 @@ export default function AdminCategories() {
     },
   ];
 
+  // Every product, not just the listed ones: a discontinued product still points at
+  // this category, and deleting it out from under one orphans it.
+  const confirmCount = confirming ? productCountOf(products, confirming.slug, { all: true }) : 0;
+
   return (
     <>
       <PageHeader
         title="Categories"
-        subtitle="Two levels. Subcategories are edited inside their parent."
+        subtitle="Two levels. Subcategories are edited inside their parent, and the shop nav is built from this list."
         actions={
           <Button iconLeft={Icon.add} onClick={() => open(null)}>
             New category
@@ -158,122 +256,148 @@ export default function AdminCategories() {
         }
       />
 
-      {form && (
-        <Panel className="mt-6 mb-6 p-4 md:p-6">
-          <form onSubmit={onSave}>
-            <FormSection title={form._id ? `Edit ${form.name}` : 'New category'}>
-              <FormRow columns={3}>
-                <Field label="Name" required>
+      <div className="mt-6">
+        <DataTable
+          columns={columns}
+          rows={categories}
+          rowKey={(c) => c.slug}
+          caption="Categories"
+          empty={
+            <EmptyState
+              icon={Icon.categories}
+              title="No categories yet."
+              body="The shop's navigation and its catalogue filters are both built from this list."
+              action={
+                <Button iconLeft={Icon.add} onClick={() => open(null)}>
+                  New category
+                </Button>
+              }
+            />
+          }
+        />
+      </div>
+
+      <Modal
+        open={Boolean(form)}
+        onClose={() => setForm(null)}
+        title={editing ? `Edit ${form.name || 'category'}` : 'New category'}
+        description="Subcategories are saved with their parent."
+        size="lg"
+      >
+        {form && (
+          <form id="category-form" onSubmit={onSave} noValidate className="flex flex-col gap-6">
+            <FormSection title="Category">
+              <FormRow columns={2}>
+                <Field label="Name" required error={showError('name')}>
                   <Input
-                    required
                     value={form.name}
                     onChange={(e) => {
                       const name = e.target.value;
-                      // The slug follows the name until someone edits the slug themselves.
+                      // The slug follows the name until someone edits the slug
+                      // themselves — then it is theirs and stops being overwritten.
                       set(
-                        form._id || form.slug !== slugify(form.name) ? { name } : { name, slug: slugify(name) },
+                        form.original || form.slug !== slugify(form.name)
+                          ? { name }
+                          : { name, slug: slugify(name) },
                       );
                     }}
                   />
                 </Field>
-                <Field label="Slug" required helper="Appears in the shop URL: /c/wound-care">
-                  <Input required value={form.slug} onChange={(e) => set({ slug: e.target.value })} />
-                </Field>
-                <Field label="Sort order" helper="Lower numbers come first in the shop nav.">
-                  <Input type="number" value={form.order} onChange={(e) => set({ order: e.target.value })} />
+                <Field
+                  label="Slug"
+                  required
+                  error={showError('slug')}
+                  helper={showError('slug') ? undefined : 'Appears in the shop URL: /c/wound-care'}
+                >
+                  <Input
+                    className="font-mono"
+                    value={form.slug}
+                    onChange={(e) => set({ slug: slugify(e.target.value) })}
+                  />
                 </Field>
               </FormRow>
 
-              <Field label="Image">
-                <div className="flex items-center gap-3">
-                  {form.image && (
-                    <img
-                      src={form.image}
-                      alt=""
-                      className="size-11 shrink-0 rounded-lg border border-edge bg-surface object-contain p-1"
-                    />
-                  )}
-                  <div className="min-w-0 flex-1">
-                    <FileDrop
-                      accept="image/*"
-                      multiple={false}
-                      files={[]}
-                      onAdd={(files) => onImage(files[0])}
-                      hint="PNG or JPG"
-                    />
-                  </div>
-                  {form.image && (
-                    <Button
-                      variant="tertiary"
-                      size="sm"
-                      type="button"
-                      onClick={() => set({ image: '' })}
-                      className="shrink-0 text-error-700 hover:bg-error-bg"
-                    >
-                      Remove
-                    </Button>
-                  )}
-                </div>
+              <Field label="Icon" helper="Shown in the shop's category menu and on its catalogue tiles.">
+                <Select value={form.icon} onChange={(e) => set({ icon: e.target.value })}>
+                  {ICON_CHOICES.map((c) => (
+                    <option key={c.value} value={c.value}>
+                      {c.label}
+                    </option>
+                  ))}
+                </Select>
               </Field>
 
-              <fieldset className="rounded-xl border border-edge p-4">
-                <legend className="type-body-sm px-1 font-medium text-fg">Subcategories</legend>
-                <p className="type-caption mb-3 text-fg-muted">
-                  Saved with the category. Removing one that still has products is refused, with the
-                  count.
-                </p>
+              {/* Renaming a slug changes a URL that may already be linked. Worth
+                  saying once, at the moment it becomes true. */}
+              {editing && form.slug !== form.original && (
+                <Alert tone="warning" title="This changes the category's URL">
+                  /c/{form.original} becomes /c/{form.slug}. Any existing link to the old address
+                  stops resolving.
+                </Alert>
+              )}
+            </FormSection>
 
-                <div className="flex flex-col gap-3">
-                  {form.subcategories.map((s, i) => (
-                    <div key={s._id || `new-${i}`} className="flex flex-wrap items-end gap-3">
+            <FormSection
+              title="Subcategories"
+              description="Removing one that still has products against it is refused, with the count."
+            >
+              {form.children.length === 0 ? (
+                <p className="type-body-sm text-fg-secondary">
+                  None yet. A category with no subcategories is valid — three of the six that shipped
+                  have none.
+                </p>
+              ) : (
+                <ul className="flex flex-col gap-3">
+                  {form.children.map((child, i) => (
+                    <li key={i} className="flex flex-wrap items-end gap-3">
                       <div className="min-w-40 flex-1">
-                        <Field label="Name">
+                        <Field label={i === 0 ? 'Name' : undefined} htmlFor={`sub-name-${i}`}>
                           <Input
-                            value={s.name}
+                            id={`sub-name-${i}`}
+                            aria-label={`Subcategory ${i + 1} name`}
+                            value={child.name}
                             onChange={(e) => {
                               const name = e.target.value;
-                              setSub(
+                              setChild(
                                 i,
-                                s._id || s.slug !== slugify(s.name) ? { name } : { name, slug: slugify(name) },
+                                child.slug !== slugify(child.name) ? { name } : { name, slug: slugify(name) },
                               );
                             }}
                           />
                         </Field>
                       </div>
                       <div className="min-w-40 flex-1">
-                        <Field label="Slug">
-                          <Input value={s.slug} onChange={(e) => setSub(i, { slug: e.target.value })} />
+                        <Field label={i === 0 ? 'Slug' : undefined} htmlFor={`sub-slug-${i}`}>
+                          <Input
+                            id={`sub-slug-${i}`}
+                            aria-label={`Subcategory ${i + 1} slug`}
+                            className="font-mono"
+                            value={child.slug}
+                            onChange={(e) => setChild(i, { slug: slugify(e.target.value) })}
+                          />
                         </Field>
                       </div>
-                      <Button
-                        variant="tertiary"
-                        type="button"
-                        iconLeft={Icon.delete}
-                        onClick={() =>
-                          setForm((f) => ({
-                            ...f,
-                            subcategories: f.subcategories.filter((_, j) => j !== i),
-                          }))
-                        }
-                      >
-                        Remove
-                      </Button>
-                    </div>
+                      <IconButton
+                        icon={Icon.delete}
+                        label={`Remove subcategory ${i + 1}${child.name ? `, ${child.name}` : ''}`}
+                        onClick={() => setForm((f) => ({ ...f, children: f.children.filter((_, j) => j !== i) }))}
+                        className="mb-0.5 text-error-700"
+                      />
+                    </li>
                   ))}
-                </div>
+                </ul>
+              )}
 
+              <div>
                 <Button
                   variant="secondary"
                   type="button"
                   iconLeft={Icon.add}
-                  className="mt-3"
-                  onClick={() =>
-                    setForm((f) => ({ ...f, subcategories: [...f.subcategories, { name: '', slug: '' }] }))
-                  }
+                  onClick={() => setForm((f) => ({ ...f, children: [...f.children, { name: '', slug: '', count: 0 }] }))}
                 >
                   Add subcategory
                 </Button>
-              </fieldset>
+              </div>
             </FormSection>
 
             <FormActions>
@@ -281,37 +405,12 @@ export default function AdminCategories() {
                 Cancel
               </Button>
               <Button type="submit" loading={busy} loadingLabel="Saving…">
-                Save category
+                {editing ? 'Save changes' : 'Create category'}
               </Button>
             </FormActions>
           </form>
-        </Panel>
-      )}
-
-      <div className="mt-6">
-        {list.error ? (
-          <ErrorState thing="the categories" detail={list.error} onRetry={list.reload} />
-        ) : (
-          <DataTable
-            columns={columns}
-            rows={list.data || []}
-            rowKey={(c) => c._id}
-            caption="Categories"
-            loading={list.loading}
-            empty={
-              <EmptyState
-                title="No categories yet."
-                body="The shop nav is built from these."
-                action={
-                  <Button iconLeft={Icon.add} onClick={() => open(null)}>
-                    New category
-                  </Button>
-                }
-              />
-            }
-          />
         )}
-      </div>
+      </Modal>
 
       <ConfirmModal
         open={Boolean(confirming)}
@@ -321,8 +420,22 @@ export default function AdminCategories() {
         confirmLabel="Delete"
         destructive
         loading={deleting}
+        // A category with products in it cannot be deleted, so the confirm button
+        // would be a control that only ever produces an error. Saying so here beats
+        // letting someone click it to find out.
+        confirmDisabled={confirmCount > 0}
       >
-        Delete &quot;{confirming?.name}&quot;? This cannot be undone.
+        {confirmCount > 0 ? (
+          <>
+            &quot;{confirming?.name}&quot; still has{' '}
+            <strong>
+              {formatQty(confirmCount)} product{confirmCount === 1 ? '' : 's'}
+            </strong>{' '}
+            in it. Move or delete them first, or they leave the catalogue with no way back to them.
+          </>
+        ) : (
+          <>Delete &quot;{confirming?.name}&quot;? This cannot be undone.</>
+        )}
       </ConfirmModal>
     </>
   );

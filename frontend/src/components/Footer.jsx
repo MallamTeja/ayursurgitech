@@ -25,7 +25,7 @@ export default function Footer() {
     <footer className="mt-16 bg-blue-900 text-blue-100">
       <Container className="grid gap-8 py-12 md:grid-cols-2 lg:grid-cols-4">
         <div>
-          <p className="font-display text-2xl font-semibold text-white">AyurSurgiTech</p>
+          <p className="font-display text-2xl font-semibold text-white">AayursurgiTech</p>
           {/* Flat tokens, no opacity modifiers: /80 and /70 composite a colour that is not in
               DESIGN-SYSTEM, which forbids invented colours. Contrast was already fine. */}
           <p className="mt-2 max-w-xs text-sm text-blue-100">

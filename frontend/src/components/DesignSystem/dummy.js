@@ -57,7 +57,7 @@ export const categories = [
 /* Products                                                                   */
 /* -------------------------------------------------------------------------- */
 
-// `image: null` everywhere, on purpose. §22 asks for actual Ayursurgi product
+// `image: null` everywhere, on purpose. §22 asks for actual Aayursurgi product
 // photography and explicitly rules out generic stock imagery, so rather than
 // dress the system in pictures of somebody else's syringes, ProductImage renders
 // a category-glyph placeholder. It is honest about being unfinished, it holds the

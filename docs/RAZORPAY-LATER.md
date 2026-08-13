@@ -213,7 +213,7 @@ const rzp = new Razorpay({
   amount: order.grandTotal,    // paise, verbatim — see §5
   currency: 'INR',
   order_id: razorpayOrderId,   // from POST /api/orders
-  name: 'AyurSurgiTech',
+  name: 'AayursurgiTech',
   description: `Order ${order._id}`,
   prefill: { name: order.userName, contact: order.userPhone },
   notes: { orderId: order._id },

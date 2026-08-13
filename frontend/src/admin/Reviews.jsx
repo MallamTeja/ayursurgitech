@@ -1,27 +1,32 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { del, put } from '../lib/api';
-import { formatDate } from '../lib/date';
-import useFetch from '../lib/useFetch';
 import {
+  Avatar,
   Badge,
   Button,
   ConfirmModal,
   DataTable,
   EmptyState,
   ErrorState,
-  Field,
   Icon,
   PageHeader,
-  Select,
-  TableToolbar,
+  Panel,
+  Tabs,
+  formatDateTime,
   useToast,
 } from '../components/DesignSystem';
+import { reviewsApi, useAdminData } from './data';
 
-// `Rating` is a legacy component being deleted with the old Tailwind palette. This is
-// used nowhere else, so it stays local rather than becoming a Design System export.
+// Nothing a buyer writes is public until it is approved here, so this screen
+// defaults to the queue rather than to everything.
+//
+// THE FILTER IS TABS, not a dropdown. There are exactly three states and the counts
+// matter — "Pending 3" is the number this screen exists for, and a <select> hides it
+// behind a click. Tabs put both the choice and the workload in view.
+
+/** Stars. Local, because nothing else in the system renders a rating yet. */
 function Stars({ value }) {
-  const filled = Math.round(Number(value) || 0);
+  const filled = Math.max(0, Math.min(5, Math.round(Number(value) || 0)));
   return (
     <span className="inline-flex items-center gap-0.5">
       {[1, 2, 3, 4, 5].map((i) => (
@@ -29,35 +34,47 @@ function Stars({ value }) {
           key={i}
           size={14}
           aria-hidden="true"
+          // §4: the count is spoken by the label below, so the colour is never
+          // carrying the rating on its own.
           className={i <= filled ? 'fill-warning text-warning' : 'text-edge-strong'}
         />
       ))}
-      <span className="sr-only-ds">{Number(value) || 0} out of 5</span>
+      <span className="sr-only-ds">{filled} out of 5</span>
     </span>
   );
 }
 
-// Nothing a shopper wrote is public until it is approved here, so this defaults to the queue.
 export default function AdminReviews() {
   const [params, setParams] = useSearchParams();
-  const status = params.get('status') || 'pending';
-  const list = useFetch(`/admin/reviews?status=${status}`);
-  const [busyId, setBusyId] = useState(null);
-  const [confirmTarget, setConfirmTarget] = useState(null); // review awaiting delete confirmation
   const toast = useToast();
+  const [busyId, setBusyId] = useState(null);
+  const [confirming, setConfirming] = useState(null);
 
-  const rows = list.data || [];
+  const { data, loading, error } = useAdminData((s) => s.reviews, { forced: params.get('state') });
 
-  const drop = (id) => list.set(rows.filter((r) => r._id !== id));
+  const status = ['pending', 'approved', 'all'].includes(params.get('status'))
+    ? params.get('status')
+    : 'pending';
+
+  const counts = useMemo(
+    () => ({
+      pending: data.filter((r) => r.status === 'pending').length,
+      approved: data.filter((r) => r.status === 'approved').length,
+      all: data.length,
+    }),
+    [data],
+  );
+
+  const rows = useMemo(
+    () => (status === 'all' ? data : data.filter((r) => r.status === status)),
+    [data, status],
+  );
 
   async function onApprove(review) {
-    setBusyId(review._id);
+    setBusyId(review.id);
     try {
-      await put(`/admin/reviews/${review._id}`, { status: 'approved' });
-      // Off the pending queue immediately, so the count on screen is the count outstanding.
-      if (status === 'pending') drop(review._id);
-      else list.set(rows.map((r) => (r._id === review._id ? { ...r, status: 'approved' } : r)));
-      toast.success(`Approved ${review.userName}'s review. It is live on the product page.`);
+      await reviewsApi.setStatus(review.id, 'approved');
+      toast.success(`Approved ${review.author}'s review. It is live on the product page.`);
     } catch (err) {
       toast.error(err.message);
     } finally {
@@ -65,13 +82,24 @@ export default function AdminReviews() {
     }
   }
 
-  async function onConfirmDelete() {
-    const review = confirmTarget;
-    setBusyId(review._id);
+  async function onUnapprove(review) {
+    setBusyId(review.id);
     try {
-      await del(`/admin/reviews/${review._id}`);
-      drop(review._id);
-      setConfirmTarget(null);
+      await reviewsApi.setStatus(review.id, 'pending');
+      toast.success(`${review.author}'s review is back in the queue and off the product page.`);
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function onDelete() {
+    const review = confirming;
+    setBusyId(review.id);
+    try {
+      await reviewsApi.remove(review.id);
+      setConfirming(null);
       toast.success('Review deleted. The product rating has been recomputed.');
     } catch (err) {
       toast.error(err.message);
@@ -82,71 +110,101 @@ export default function AdminReviews() {
 
   const columns = [
     {
+      key: 'author',
+      header: 'Reviewer',
+      primary: true,
+      className: 'align-top',
+      render: (r) => (
+        <span className="flex min-w-0 items-start gap-2.5">
+          <Avatar name={r.author} size="md" />
+          <span className="min-w-0">
+            <span className="block truncate font-medium text-fg">{r.author}</span>
+            <span className="type-caption block truncate text-fg-secondary">{r.org}</span>
+          </span>
+        </span>
+      ),
+    },
+    {
       key: 'product',
       header: 'Product',
-      primary: true,
-      render: (r) =>
-        r.productSlug ? (
-          <a
-            href={`/p/${r.productSlug}`}
-            target="_blank"
-            rel="noreferrer"
-            className="text-brand-700 underline decoration-brand-500 underline-offset-2 hover:text-brand-900"
-          >
-            {r.productName}
-          </a>
-        ) : (
-          <span className="text-fg-muted">{r.productName || 'Deleted product'}</span>
-        ),
+      className: 'align-top',
+      render: (r) => <span className="block max-w-56 text-fg-secondary">{r.productName}</span>,
     },
-    { key: 'reviewer', header: 'Reviewer', className: 'whitespace-nowrap', render: (r) => r.userName },
-    { key: 'rating', header: 'Rating', render: (r) => <Stars value={r.rating} /> },
-    { key: 'text', header: 'Review', className: 'max-w-md text-fg-secondary', render: (r) => r.text },
     {
-      key: 'date',
-      header: 'Date',
-      className: 'whitespace-nowrap',
-      render: (r) => formatDate(r.createdAt),
+      key: 'rating',
+      header: 'Rating',
+      className: 'align-top whitespace-nowrap',
+      render: (r) => <Stars value={r.rating} />,
+    },
+    {
+      key: 'body',
+      header: 'Review',
+      // max-w on the cell rather than truncation: moderating a review means reading
+      // it, and a one-line clamp with an ellipsis hides the sentence the decision
+      // turns on.
+      className: 'align-top max-w-md text-fg-secondary',
+      render: (r) => r.body,
+    },
+    {
+      key: 'at',
+      header: 'Submitted',
+      className: 'align-top whitespace-nowrap',
+      render: (r) => formatDateTime(r.at),
     },
     {
       key: 'actions',
       header: '',
       align: 'right',
+      className: 'align-top',
       render: (r) => {
-        // Every row's buttons read as bare "Approve" / "Delete" in a screen reader's control
-        // list. One reviewer can review several products and two reviewers can share a name,
-        // so the accessible name needs both to identify a row.
-        const subject = `${r.userName}'s review of ${r.productName || 'Deleted product'}`;
+        // Both buttons read as bare "Approve" / "Delete" in a screen reader's
+        // control list. One reviewer can review several products and two reviewers
+        // can share a name, so the accessible name needs both to identify a row.
+        const subject = `${r.author}'s review of ${r.productName}`;
+        const busy = busyId === r.id;
         return (
-          <div className="inline-flex items-center gap-2">
+          <span className="inline-flex flex-wrap items-center justify-end gap-1">
             {r.status === 'pending' ? (
               <Button
                 variant="tertiary"
                 size="sm"
                 iconLeft={Icon.check}
-                disabled={busyId === r._id}
+                disabled={busy}
                 onClick={() => onApprove(r)}
                 aria-label={`Approve ${subject}`}
               >
                 Approve
               </Button>
             ) : (
-              <Badge tone="success" size="sm" icon={Icon.success}>
-                Approved
-              </Badge>
+              <>
+                <Badge tone="success" size="sm" icon={Icon.success}>
+                  Approved
+                </Badge>
+                {/* Approval is reversible. Without this, a review approved by
+                    mistake can only be dealt with by deleting it. */}
+                <Button
+                  variant="tertiary"
+                  size="sm"
+                  disabled={busy}
+                  onClick={() => onUnapprove(r)}
+                  aria-label={`Return ${subject} to the queue`}
+                >
+                  Unapprove
+                </Button>
+              </>
             )}
             <Button
               variant="tertiary"
               size="sm"
               iconLeft={Icon.delete}
-              className="text-error-700"
-              disabled={busyId === r._id}
-              onClick={() => setConfirmTarget(r)}
+              className="text-error-700 hover:bg-error-bg"
+              disabled={busy}
+              onClick={() => setConfirming(r)}
               aria-label={`Delete ${subject}`}
             >
               Delete
             </Button>
-          </div>
+          </span>
         );
       },
     },
@@ -157,61 +215,79 @@ export default function AdminReviews() {
       <PageHeader
         title="Reviews"
         subtitle={
-          status === 'pending'
-            ? `${rows.length} waiting for you.`
-            : 'Approving a review recomputes the product rating.'
+          counts.pending > 0
+            ? `${counts.pending} waiting for you. Nothing is visible on a product page until it is approved.`
+            : 'Nothing waiting. A review is invisible on the product page until it is approved here.'
         }
       />
 
-      <div className="mt-6 mb-4">
-        <TableToolbar
-          filters={
-            <Field label="Show" className="w-40">
-              <Select value={status} onChange={(e) => setParams({ status: e.target.value })}>
-                <option value="pending">Pending</option>
-                <option value="approved">Approved</option>
-                <option value="all">All</option>
-              </Select>
-            </Field>
-          }
-        />
+      <Tabs
+        className="mt-6"
+        value={status}
+        onChange={(next) => setParams(next === 'pending' ? {} : { status: next })}
+        tabs={[
+          { value: 'pending', label: 'Pending', icon: Icon.pending, count: counts.pending },
+          { value: 'approved', label: 'Approved', icon: Icon.success, count: counts.approved },
+          { value: 'all', label: 'All', icon: Icon.reports, count: counts.all },
+        ]}
+      />
+
+      <div className="mt-6">
+        {error ? (
+          <Panel>
+            <ErrorState thing="the reviews" detail={error} onRetry={() => setParams({})} />
+          </Panel>
+        ) : (
+          <DataTable
+            columns={columns}
+            rows={rows}
+            rowKey={(r) => r.id}
+            caption="Reviews"
+            // `default`, not the admin `compact`: a review is a paragraph, and
+            // 40px rows put five lines of prose in a 40px box. The density classes
+            // are relaxed / default / compact — there is no fourth.
+            density="default"
+            loading={loading}
+            empty={
+              <EmptyState
+                variant={status === 'pending' ? 'nothing-yet' : 'no-results'}
+                icon={status === 'pending' ? Icon.success : Icon.star}
+                title={
+                  status === 'pending'
+                    ? 'Nothing waiting to be moderated.'
+                    : status === 'approved'
+                      ? 'No approved reviews yet.'
+                      : 'No reviews at all yet.'
+                }
+                body={
+                  status === 'pending'
+                    ? 'The queue is clear. New reviews land here as buyers write them.'
+                    : 'Approved reviews appear on their product page in the shop.'
+                }
+                action={
+                  status === 'all' ? undefined : (
+                    <Button variant="secondary" onClick={() => setParams({ status: 'all' })}>
+                      Show all reviews
+                    </Button>
+                  )
+                }
+              />
+            }
+          />
+        )}
       </div>
 
-      {list.error ? (
-        <ErrorState thing="the reviews" detail={list.error} onRetry={list.reload} />
-      ) : (
-        <DataTable
-          columns={columns}
-          rows={rows}
-          rowKey={(r) => r._id}
-          caption="Reviews"
-          loading={list.loading}
-          empty={
-            <EmptyState
-              variant={status === 'pending' ? 'nothing-yet' : 'no-results'}
-              title={status === 'pending' ? 'No reviews waiting' : 'No reviews to show.'}
-              action={
-                status === 'all' ? undefined : (
-                  <Button variant="secondary" onClick={() => setParams({ status: 'all' })}>
-                    Show all reviews
-                  </Button>
-                )
-              }
-            />
-          }
-        />
-      )}
-
       <ConfirmModal
-        open={Boolean(confirmTarget)}
-        onClose={() => setConfirmTarget(null)}
-        onConfirm={onConfirmDelete}
+        open={Boolean(confirming)}
+        onClose={() => setConfirming(null)}
+        onConfirm={onDelete}
         title="Delete review"
         confirmLabel="Delete"
         destructive
-        loading={busyId === confirmTarget?._id}
+        loading={Boolean(confirming) && busyId === confirming.id}
       >
-        Delete {confirmTarget?.userName}&rsquo;s review? This cannot be undone.
+        Delete {confirming?.author}&rsquo;s review of {confirming?.productName}? The product rating is
+        recomputed without it. This cannot be undone.
       </ConfirmModal>
     </>
   );

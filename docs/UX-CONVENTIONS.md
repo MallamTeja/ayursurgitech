@@ -1,4 +1,4 @@
-# AyurSurgiTech — UX Conventions for Indian Surgical Supply
+# AayursurgiTech — UX Conventions for Indian Surgical Supply
 
 Category conventions for the pages. Subordinate to `SPEC.md` and `DESIGN-SYSTEM.md` — where
 this file and those disagree, those win. Every rule below is buildable with the frozen

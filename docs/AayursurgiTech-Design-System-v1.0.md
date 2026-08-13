@@ -1,4 +1,4 @@
-# AyursurgiTech Design System
+# AayursurgiTech Design System
 
 **Version:** 1.0  
 **Design Direction:** Clinical Precision  
@@ -9,7 +9,7 @@
 
 ## 1. Design Philosophy
 
-AyursurgiTech should communicate:
+AayursurgiTech should communicate:
 
 > **Clinical trust + precision + cleanliness + reliability + modern technology**
 
@@ -304,7 +304,7 @@ Prefer:
 
 # 9. Border Radius
 
-AyursurgiTech should feel precise rather than overly rounded.
+AayursurgiTech should feel precise rather than overly rounded.
 
 | Component | Radius |
 |---|---:|
@@ -389,7 +389,7 @@ The admin panel should be:
 
 ```text
 ┌───────────────┬─────────────────────────────────────┐
-│ AYURSURGI     │ Dashboard                           │
+│ AAYURSURGI    │ Dashboard                           │
 │               │                                     │
 │ Dashboard     │ Revenue    Orders    Customers      │
 │ Products      │ ₹12.4L     348       126            │
@@ -751,7 +751,7 @@ Typical sizes:
 
 Prioritize:
 
-1. Actual Ayursurgi products
+1. Actual Aayursurgi products
 2. Product close-ups
 3. Clinical environments
 4. Healthcare professionals using relevant equipment
@@ -1026,7 +1026,7 @@ Every new visual pattern should be evaluated against the existing design system 
 
 # 33. Brand Summary
 
-## AyursurgiTech should feel like:
+## AayursurgiTech should feel like:
 
 > **A modern, precise, trustworthy medical-device company powered by technology.**
 
@@ -1088,7 +1088,7 @@ More actual products.
 
 ## 34. Implementation Principle
 
-This document is the **visual contract** for AyursurgiTech.
+This document is the **visual contract** for AayursurgiTech.
 
 Before adding a new component, page, or visual treatment, ask:
 
@@ -1098,4 +1098,4 @@ If not, it should not be introduced without a clear reason.
 
 ---
 
-**End of AyursurgiTech Design System v1.0**
+**End of AayursurgiTech Design System v1.0**

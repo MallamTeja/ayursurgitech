@@ -1,6 +1,6 @@
-# AyursurgiTech — Project Overview
+# AayursurgiTech — Project Overview
 
-**Project:** AyursurgiTech  
+**Project:** AayursurgiTech  
 **Project Type:** B2B Medical Products & Distribution Platform  
 **Status:** Initial Product/Architecture Planning  
 **Document Version:** 1.0  
@@ -10,7 +10,7 @@
 
 ## 1. Executive Summary
 
-AyursurgiTech is a technology platform being developed for a medical-products distributor/manufacturer to manage and sell medical and surgical products through a centralized digital platform.
+AayursurgiTech is a technology platform being developed for a medical-products distributor/manufacturer to manage and sell medical and surgical products through a centralized digital platform.
 
 The platform is intended to support the complete business lifecycle:
 
@@ -47,7 +47,7 @@ The goal is to create a professional, reliable, scalable B2B medical-commerce an
 
 # 2. Business Context
 
-AyursurgiTech is being developed as a freelancing technology project under a broader technology-services initiative.
+AayursurgiTech is being developed as a freelancing technology project under a broader technology-services initiative.
 
 The business operates in the medical-products domain and deals with products such as:
 
@@ -84,7 +84,7 @@ The platform should combine:
 
 # 4. Product Positioning
 
-AyursurgiTech should not be treated as a generic e-commerce website.
+AayursurgiTech should not be treated as a generic e-commerce website.
 
 It is better defined as:
 
@@ -209,7 +209,7 @@ A manager may require visibility into:
 # 6. High-Level System Architecture
 
 ```text
-                         AYURSURGITECH
+                         AAYURSURGITECH
                               │
         ┌─────────────────────┼─────────────────────┐
         │                     │                     │
@@ -1054,7 +1054,7 @@ Agent portal should be action-focused.
 
 The complete visual system is documented separately in:
 
-**AyursurgiTech Design System v1.0**
+**AayursurgiTech Design System v1.0**
 
 ---
 
@@ -1331,7 +1331,7 @@ These should not unnecessarily complicate V1.
 
 # 39. AI Opportunities
 
-Because the broader technology initiative includes AI capabilities, AyursurgiTech can later incorporate AI in controlled areas.
+Because the broader technology initiative includes AI capabilities, AayursurgiTech can later incorporate AI in controlled areas.
 
 Potential use cases:
 
@@ -1589,7 +1589,7 @@ Advanced integrations
 
 Before final database and workflow implementation, clarify:
 
-1. Is Ayursurgi the manufacturer, distributor, or both?
+1. Is Aayursurgi the manufacturer, distributor, or both?
 2. Who are the actual customers?
 3. Can customers purchase directly?
 4. Is quotation mandatory for certain products?
@@ -1703,7 +1703,7 @@ The architecture should make future capabilities possible without forcing unnece
 
 ### Product
 
-**AyursurgiTech**
+**AayursurgiTech**
 
 ### Category
 
@@ -1773,7 +1773,7 @@ Inter
 
 # 48. Final Product Statement
 
-AyursurgiTech is intended to become a **professional digital operating platform for medical-product distribution**, connecting products, customers, sales agents, orders, inventory, logistics, payments, and business intelligence in one system.
+AayursurgiTech is intended to become a **professional digital operating platform for medical-product distribution**, connecting products, customers, sales agents, orders, inventory, logistics, payments, and business intelligence in one system.
 
 The initial implementation should remain focused on the core business workflow while establishing strong foundations for:
 

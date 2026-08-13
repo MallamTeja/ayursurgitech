@@ -1,4 +1,4 @@
-// AyursurgiTech Design System v1.0 — public surface.
+// AayursurgiTech Design System v1.0 — public surface.
 //
 //     import { Button, DataTable, StatusBadge } from '@/components/DesignSystem'
 //

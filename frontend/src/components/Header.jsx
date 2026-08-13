@@ -155,7 +155,7 @@ export default function Header() {
           to="/"
           className={`font-display text-lg font-semibold tracking-display whitespace-nowrap md:text-2xl ${onDark}`}
         >
-          AyurSurgiTech
+          AayursurgiTech
         </Link>
 
         <div ref={dropdown} className="relative hidden md:block">

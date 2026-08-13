@@ -1,4 +1,4 @@
-# AyurSurgiTech — Deployment
+# AayursurgiTech — Deployment
 
 > ## Verified against the built code on 8 August 2026
 >

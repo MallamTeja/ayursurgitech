@@ -13,27 +13,40 @@ export const slugify = (value) =>
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '');
 
-// useLoad lived here and was lib/useFetch.js line for line — same nonce retry, same live flag,
-// same three states. The admin screens import useFetch directly now.
+// ORDER_TONE lived here: a five-state map, written because the old REST API emitted
+// five statuses and the design system's registry has twelve. It was a second,
+// drifting copy of ORDER_STATUS. The screens read the registry directly now, so a
+// status is spelled and coloured the same on the ops desk, in the stepper, in the
+// audit trail and on the customer's own order page.
 
-/**
- * Order status → a Design System tone and glyph.
- *
- * WHY THIS IS NOT the design system's ORDER_STATUS. That registry is §28's
- * twelve-state lifecycle from the spec — confirmed, packed, inTransit,
- * outForDelivery, returnRequested. backend/routes/orders.js writes five states,
- * and none of the other seven can occur. Passing a status this app does not have
- * to StatusBadge renders a neutral "Unknown" chip, so the five real ones map here
- * instead. Labels still come from components/StatusBadge, which is where the
- * shopper's order page reads them — one spelling for both audiences.
- *
- * Nothing in flight is green: payment pending is the normal state of a freshly
- * placed order (payment is stubbed), and cancelled is a fact rather than an error.
- */
-export const ORDER_TONE = {
-  paymentPending: { tone: 'warning', icon: 'pending' },
-  placed: { tone: 'info', icon: 'check' },
-  shipped: { tone: 'brand', icon: 'shipments' },
-  delivered: { tone: 'success', icon: 'success' },
-  cancelled: { tone: 'neutral', icon: 'blocked' },
+/* -------------------------------------------------------------------------- */
+/* Money at the form boundary                                                 */
+/* -------------------------------------------------------------------------- */
+
+// Money is integer paise everywhere in this application — see
+// DesignSystem/format.js. A form input is the one place it is not: nobody types
+// 425000 for ₹4,250. These two functions are that boundary, and they are the only
+// place a division or multiplication by 100 belongs.
+//
+// formatINR output must NEVER reach an input value: "₹4,250.00" parses back to NaN,
+// and the thousands separator turns ₹2,480.00 into 200 paise.
+
+/** Paise → a plain editable number string. 425000 → "4250", 425050 → "4250.50". */
+export const paiseToRupees = (paise) => {
+  const value = (Number(paise) || 0) / 100;
+  return Number.isInteger(value) ? String(value) : value.toFixed(2);
+};
+
+/** "4,250.50" or " 4250 " → 425050. Grouping and stray spaces survive the trip. */
+export const rupeesToPaise = (rupees) => {
+  const cleaned = String(rupees ?? '').replace(/[,\s₹]/g, '');
+  if (cleaned === '' || Number.isNaN(Number(cleaned))) return 0;
+  // Rounded, not truncated: 40.555 entered by hand should not silently lose a paisa.
+  return Math.round(Number(cleaned) * 100);
+};
+
+/** Is this a number a money field can accept at all? Blank is not — it is missing. */
+export const isMoney = (rupees) => {
+  const cleaned = String(rupees ?? '').replace(/[,\s₹]/g, '');
+  return cleaned !== '' && !Number.isNaN(Number(cleaned)) && Number(cleaned) >= 0;
 };

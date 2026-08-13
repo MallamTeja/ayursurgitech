@@ -91,8 +91,8 @@ export default function ShopFooter() {
               </li>
               <li className="type-body-sm flex items-start gap-2 text-fg-secondary">
                 <Icon.mail size={15} className="mt-0.5 shrink-0 text-fg-muted" />
-                <a href="mailto:orders@ayursurgitech.com" className="break-all underline-offset-2 hover:text-brand-700 hover:underline">
-                  orders@ayursurgitech.com
+                <a href="mailto:orders@aayursurgitech.com" className="break-all underline-offset-2 hover:text-brand-700 hover:underline">
+                  orders@aayursurgitech.com
                 </a>
               </li>
               <li className="type-body-sm flex items-start gap-2 text-fg-secondary">
@@ -107,7 +107,7 @@ export default function ShopFooter() {
 
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <p className="type-caption text-fg-secondary">
-            © {new Date().getFullYear()} AyursurgiTech. All prices exclusive of GST unless stated.
+            © {new Date().getFullYear()} AayursurgiTech. All prices exclusive of GST unless stated.
           </p>
           <ul className="flex flex-wrap gap-x-5 gap-y-1">
             {['Terms of sale', 'Privacy', 'Returns'].map((label) => (

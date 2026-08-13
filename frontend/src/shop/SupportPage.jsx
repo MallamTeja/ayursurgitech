@@ -102,8 +102,8 @@ const CHANNELS = [
   {
     icon: Icon.mail,
     title: 'Email orders and quotes',
-    value: 'orders@ayursurgitech.com',
-    href: 'mailto:orders@ayursurgitech.com',
+    value: 'orders@aayursurgitech.com',
+    href: 'mailto:orders@aayursurgitech.com',
     hours: 'Replies within one working day',
     note: 'Send a purchase order, a rate-contract request or a bulk requirement list.',
   },

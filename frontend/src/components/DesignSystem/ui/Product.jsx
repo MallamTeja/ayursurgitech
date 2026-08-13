@@ -23,7 +23,7 @@ import { Button } from './Button.jsx';
 /**
  * The product image, and — until there is real photography — its placeholder.
  *
- * §22 ranks actual Ayursurgi product photography first and explicitly rejects
+ * §22 ranks actual Aayursurgi product photography first and explicitly rejects
  * generic stock imagery, so this system ships no photographs rather than the
  * wrong ones. The placeholder is deliberately a placeholder: it holds the exact
  * aspect ratio and position the real photo will occupy, so dropping photography in

@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 /* Design System v1.0 — "Clinical Precision", the B2B direction from
-   docs/AyursurgiTech-Design-System-v1.0.md. Its tokens are namespaced so they
+   docs/AayursurgiTech-Design-System-v1.0.md. Its tokens are namespaced so they
    cannot collide with the shop palette below — it owns "brand-", "fg-" and
    "edge-", this file keeps "blue-", "ink" and "line" — and everything it styles
    is scoped to .ds-root. Read the header of that file before adding a token to

@@ -1,4 +1,4 @@
-// /about — who AyursurgiTech is, for a procurement officer who has never bought
+// /about — who AayursurgiTech is, for a procurement officer who has never bought
 // from us and is deciding whether to.
 //
 // THE AUDIENCE IS NOT A CONSUMER. Nobody reaches a medical-consumables About page
@@ -183,7 +183,7 @@ export default function AboutPage() {
           <div className="grid gap-10 lg:grid-cols-12 lg:gap-12">
             <div className="lg:col-span-7">
               {/* Eyebrow, then the real <h1>. An earlier draft made the visible
-                  headline aria-hidden and put "About AyursurgiTech" in a hidden
+                  headline aria-hidden and put "About AayursurgiTech" in a hidden
                   h1 — which hands a screen reader the label and hides the
                   sentence. The visible line is the heading. */}
               <p className="type-label text-brand-700">About us</p>
@@ -191,7 +191,7 @@ export default function AboutPage() {
                 Medical consumables, supplied the way hospitals actually buy them.
               </h1>
               <p className="type-body-lg mt-5 max-w-2xl text-fg-secondary">
-                AyursurgiTech manufactures and distributes I.V. administration, extension, connector and vial-access
+                AayursurgiTech manufactures and distributes I.V. administration, extension, connector and vial-access
                 consumables from Hyderabad. We publish our stock, our trade prices and our documentation, so a
                 purchase decision does not depend on getting someone on the phone.
               </p>

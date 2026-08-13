@@ -35,7 +35,7 @@ export default function Foundations() {
       <Section
         title="Radius"
         spec="§9"
-        intro="Four values, and §9 is explicit that not everything is a pill: AyursurgiTech should feel precise rather than overly rounded. The nesting order matters — a panel is rounder than the cards inside it, which is what makes the nesting read as intentional."
+        intro="Four values, and §9 is explicit that not everything is a pill: AayursurgiTech should feel precise rather than overly rounded. The nesting order matters — a panel is rounder than the cards inside it, which is what makes the nesting read as intentional."
       >
         <TokenTable head={['Tailwind', 'Value', 'Shape', 'Use']}>
           {RADIUS.map((r) => (

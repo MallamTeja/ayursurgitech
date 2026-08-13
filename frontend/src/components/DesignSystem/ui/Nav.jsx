@@ -287,7 +287,7 @@ export function CustomerHeader({ items = [], activeKey, cartCount = 0, onNavigat
             <Icon.infusion size={18} />
           </span>
           <span className="type-h4 tracking-tight text-brand-900">
-            Ayursurgi<span className="text-brand-600">Tech</span>
+            Aayursurgi<span className="text-brand-600">Tech</span>
           </span>
         </a>
 
